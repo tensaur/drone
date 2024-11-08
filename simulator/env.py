@@ -11,17 +11,21 @@ actions = {
     5: np.array([0, 0, -1]),
 }
 
+
 class DroneEnv(gym.Env):
     def __init__(self):
         super(DroneEnv, self).__init__()
-        
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-1, high=1, shape=(9,), dtype=np.float32)
 
-    def reset(self, seed=None, options=None):
+        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=-1, high=1, shape=(9,), dtype=np.float32
+        )
+
+    def reset(self, n_targets=5, seed=None, options=None):
+        self.n_win = np.inf if n_targets == -1 else n_targets
+
         self.moves_left = 1000
-        self.n_win = 5
-        self.vel = np.array([0,0,0])
+        self.vel = np.array([0, 0, 0])
         self.pos = np.random.randint(-10, 11, 3)
         self.target = np.random.randint(-10, 11, 3)
         observation = self.get_observation()
