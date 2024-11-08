@@ -22,8 +22,7 @@ class DroneEnv(gym.Env):
         )
 
     def reset(self, n_targets=5, seed=None, options=None):
-        self.n_win = np.inf if n_targets == -1 else n_targets
-
+        self.n_targets = n_targets
         self.moves_left = 1000
         self.vel = np.array([0, 0, 0])
         self.pos = np.random.randint(-10, 11, 3)
@@ -46,8 +45,8 @@ class DroneEnv(gym.Env):
         if np.linalg.norm(next_pos - self.target) < 1:
             reward += 1.0
             self.target = np.random.randint(-10, 11, 3)
-            self.n_win -= 1
-            if self.n_win == 0:
+            self.n_targets -= 1
+            if self.n_targets == 0:
                 terminated = True
 
         self.pos = next_pos
