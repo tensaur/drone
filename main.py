@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import CheckpointCallback
+
 from simulator.env import DroneEnv
 
 
@@ -87,8 +89,16 @@ if __name__ == "__main__":
     env = DroneEnv()
     model = PPO("MlpPolicy", env, verbose=1)
 
+    checkpoint_callback = CheckpointCallback(
+        save_freq=50000,   
+        save_path="simulator/models/tmp",
+        name_prefix="model",
+        save_replay_buffer=True,
+        save_vecnormalize=True,
+    )
+
     if args.is_training:
-        model.learn(total_timesteps=1000000)
+        model.learn(total_timesteps=1000000, callback=checkpoint_callback)
         model.save("test_model")
     else:
         model = PPO.load("simulator/models/ppo_drone_model")
