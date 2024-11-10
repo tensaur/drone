@@ -56,11 +56,22 @@ class Visualiser3D:
         self.ax.legend()
 
 
-""" Common Issues with Reinforcement Learning
+""" 
+Common Issues with Reinforcement Learning
 - Rollout stats will not appear if env never terminates
 """
 if __name__ == "__main__":
     cmd = argparse.ArgumentParser()
+
+    cmd.add_argument(
+        "-t",
+        "--train",
+        help="Enable model training",
+        dest="is_training",
+        action=argparse.BooleanOptionalAction,
+        type=bool,
+        default=False,
+    )
     cmd.add_argument(
         "-n",
         "--n-targets",
@@ -69,15 +80,18 @@ if __name__ == "__main__":
         type=int,
         default=5,
     )
+
     args = cmd.parse_args()
     print(args)
 
     env = DroneEnv()
     model = PPO("MlpPolicy", env, verbose=1)
-    # model.learn(total_timesteps=1000000)
-    # model.save("test_model")
 
-    model = PPO.load("simulator/models/ppo_drone_model")
+    if args.is_training:
+        model.learn(total_timesteps=1000000)
+        model.save("test_model")
+    else:
+        model = PPO.load("simulator/models/ppo_drone_model")
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
