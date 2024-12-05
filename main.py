@@ -90,7 +90,7 @@ if __name__ == "__main__":
     model = PPO("MlpPolicy", env, verbose=1)
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=50000,   
+        save_freq=50000,
         save_path="simulator/models/tmp",
         name_prefix="model",
         save_replay_buffer=True,
@@ -101,7 +101,7 @@ if __name__ == "__main__":
         model.learn(total_timesteps=1000000, callback=checkpoint_callback)
         model.save("test_model")
     else:
-        model = PPO.load("simulator/models/ppo_drone_model")
+        model = PPO.load("simulator/models/tmp/model_450000_steps")
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
