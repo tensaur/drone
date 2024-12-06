@@ -11,12 +11,14 @@ from simulator.env import DroneEnv
 
 
 class Visualiser3D:
-    def __init__(self, positions, targets):
+    def __init__(self, positions, yaws, targets):
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection="3d")
 
         self.positions = positions
+        self.yaws = yaws
         self.targets = targets
+
         ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
         plt.show()
 
@@ -55,6 +57,20 @@ class Visualiser3D:
             label="Target Position",
         )
 
+        yaw_angle = self.yaws[frame]
+        dx = np.cos(yaw_angle)
+        dy = np.sin(yaw_angle)
+        dz = 0
+        self.ax.quiver(
+            self.positions[frame, 0],
+            self.positions[frame, 1],
+            self.positions[frame, 2],
+            -dx*3, -dy*3, -dz*3,
+            length=1.0,
+            color='black',
+            arrow_length_ratio=0.2
+        )
+
         self.ax.legend()
 
 
@@ -90,7 +106,7 @@ if __name__ == "__main__":
     model = PPO("MlpPolicy", env, verbose=1)
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=50000,   
+        save_freq=50000,
         save_path="simulator/models/tmp",
         name_prefix="model",
         save_replay_buffer=True,
@@ -98,24 +114,30 @@ if __name__ == "__main__":
     )
 
     if args.is_training:
-        model.learn(total_timesteps=1000000, callback=checkpoint_callback)
+        model.learn(total_timesteps=10000000, callback=checkpoint_callback)
         model.save("test_model")
     else:
-        model = PPO.load("simulator/models/ppo_drone_model")
+        model = PPO.load("simulator/models/tmp/model_1500000_steps")
 
     obs, _ = env.reset(n_targets=args.n)
+
     positions = [np.array(env.pos)]
+    yaws = [np.array(env.yaw)]
     targets = [np.array(env.target)]
 
     while True:
         action, _ = model.predict(obs)
         obs, reward, terminated, truncated, info = env.step(action)
+
         positions.append(np.array(env.pos))
+        yaws.append(np.array(env.yaw))
         targets.append(np.array(env.target))
+
         if terminated or truncated:
             break
 
     positions = np.array(positions)
+    yaws = np.array(yaws)
     targets = np.array(targets)
 
-    vis = Visualiser3D(positions, targets)
+    vis = Visualiser3D(positions, yaws, targets)
