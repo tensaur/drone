@@ -1,0 +1,14 @@
+[project]
+name = "drone"
+version = "0.1.0"
+description = "A reinforcement learning based drone controller and simulator tool for the Warwick AI drone project"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.12"
+dependencies = [
+    "gymnasium<1.0.0",
+    "matplotlib>=3.10.0",
+    "numpy>=2.2.1",
+    "stable-baselines3>=2.0.0",
+    "torch>=2.5.1",
+]
