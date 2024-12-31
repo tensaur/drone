@@ -1,6 +1,7 @@
 import argparse
 
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
@@ -9,6 +10,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 from simulator.env import DroneEnv
 
+mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 class Visualiser3D:
     def __init__(self, positions, targets):
