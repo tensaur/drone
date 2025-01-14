@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from drone_cont.ppo import Agent
-from drone_cont.env import DroneEnv
+from simulator.ppo import Agent
+from simulator.env import DroneEnv
 
 import torch
 
