@@ -2,71 +2,112 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-actions = {
-    0: np.array([1, 0, 0]),
-    1: np.array([-1, 0, 0]),
-    2: np.array([0, 1, 0]),
-    3: np.array([0, -1, 0]),
-    4: np.array([0, 0, 1]),
-    5: np.array([0, 0, -1]),
-}
-
 
 class DroneEnv(gym.Env):
     def __init__(self):
         super(DroneEnv, self).__init__()
 
-        self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
         self.observation_space = spaces.Box(
-            low=-1, high=1, shape=(9,), dtype=np.float32
+            low=-1, high=1, shape=(8,), dtype=np.float32
         )
+        self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
     def reset(self, n_targets=5, seed=None, options=None):
         self.n_targets = n_targets
-        self.moves_left = 1000
-        self.vel = np.array([0, 0, 0])
+        self.moves_left = 500
+
         self.pos = np.random.randint(-10, 11, 3)
-        self.target = np.random.randint(-10, 11, 3)
+        self.yaw = 0
+
+        self.move_target = np.random.randint(-10, 11, 3)
+        self.look_target = np.random.randint(-10, 11, 3)
+
+        self.colliders = [[[0, 0, 0], [0, 10, 0], [0, 10, 10], [0, 0, 10]]]
+
         observation = self.get_observation()
         return observation, {}
 
     def step(self, action):
+        action = np.clip(action, -1, 1)
+
         reward = 0.0
         terminated = False
         truncated = False
         info = {}
 
-        next_vel = self.vel + action * 0.1
-        next_pos = self.pos + next_vel
+        rotation_matrix = np.array(
+            [
+                [np.cos(self.yaw), -np.sin(self.yaw), 0],
+                [np.sin(self.yaw), np.cos(self.yaw), 0],
+                [0, 0, 1],
+            ]
+        )
 
-        if np.linalg.norm(self.pos - self.target) > np.linalg.norm(next_pos - self.target):
-            reward += 0.05
+        vel = np.dot(rotation_matrix, action) * 0.1
+        next_pos = np.clip(self.pos + vel, -10, 10)
 
-        if np.linalg.norm(next_pos - self.target) < 1:
+        if np.linalg.norm(next_pos - self.move_target) < 2:
             reward += 1.0
-            self.target = np.random.randint(-10, 11, 3)
+            self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
             if self.n_targets == 0:
                 terminated = True
 
-        self.pos = next_pos
-        self.vel = next_vel
+        if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
+            self.pos - self.move_target
+        ):
+            reward += 0.1
+
+        # Calculate the bounding box (min and max values for each axis)
+        p_min = np.min(self.colliders[0], axis=0)
+        p_max = np.max(self.colliders[0], axis=0)
+
+        # Check if the drone is inside the bounding box
+        if (
+            p_min[0] - 1 <= next_pos[0] <= p_max[0] + 1
+            and p_min[1] <= next_pos[1] <= p_max[1]
+            and p_min[2] <= next_pos[2] <= p_max[2]
+        ):
+            reward -= 1
 
         self.moves_left -= 1
         if self.moves_left == 0:
             truncated = True
 
-        reward -= 0.1
+        reward -= 0.2
+
+        self.pos = next_pos
+
+        # randomise yaw and look target -> learns to move towards look target regardless of yaw
+        # self.yaw = np.random.rand() * 2 * np.pi  # (self.yaw + 0.1) % (2 * np.pi)
+        # self.look_target = np.random.randint(-10, 11, 3)
+        self.look_target = np.clip(self.look_target + (np.random.randn(3) / 5), -10, 10)
+        self.yaw = np.arctan2(
+            self.pos[1] - self.look_target[1], self.pos[0] - self.look_target[0]
+        )
 
         observation = self.get_observation()
 
         return observation, reward, terminated, truncated, info
 
     def get_observation(self):
-        return np.concatenate((self.pos / 10, self.vel, self.target / 10))
+        return np.concatenate(
+            (
+                self.move_target / 10,
+                self.pos / 10,
+                [np.sin(self.yaw)],
+                [np.cos(self.yaw)],
+            )
+        )
 
     def render(self):
         pass
 
     def close(self):
         pass
+
+
+if __name__ == "__main__":
+    env = DroneEnv()
+    env.reset()
+    print(env.get_observation())
