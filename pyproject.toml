@@ -10,5 +10,8 @@ dependencies = [
     "matplotlib>=3.10.0",
     "numpy>=2.2.1",
     "stable-baselines3>=2.0.0",
+    "tensorboard>=2.18.0",
     "torch>=2.5.1",
+    "tyro>=0.9.6",
+    "wandb>=0.19.2",
 ]

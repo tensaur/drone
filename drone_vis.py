@@ -5,20 +5,24 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
+from drone_cont.ppo import Agent
 
-from simulator.env import DroneEnv
+from drone_cont.env import DroneEnv
+
+import torch
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 class Visualiser3D:
-    def __init__(self, positions, targets):
+    def __init__(self, positions, move_targets, look_targets, yaws):
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection="3d")
 
         self.positions = positions
-        self.targets = targets
+        self.move_targets = move_targets
+        self.look_targets = look_targets
+        self.yaws = yaws
+
         ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
         plt.show()
 
@@ -48,13 +52,37 @@ class Visualiser3D:
         )
 
         self.ax.scatter(
-            self.targets[frame, 0],
-            self.targets[frame, 1],
-            self.targets[frame, 2],
+            self.move_targets[frame, 0],
+            self.move_targets[frame, 1],
+            self.move_targets[frame, 2],
             color="red",
             s=100,
             marker="X",
-            label="Target Position",
+            label="Move Target Position",
+        )
+
+        self.ax.scatter(
+            self.look_targets[frame, 0],
+            self.look_targets[frame, 1],
+            self.look_targets[frame, 2],
+            color="green",
+            s=100,
+            marker="X",
+            label="Look Target Position",
+        )
+
+        yaw_angle = self.yaws[frame]
+        dx = np.cos(yaw_angle)
+        dy = np.sin(yaw_angle)
+        dz = 0
+        self.ax.quiver(
+            self.positions[frame, 0],
+            self.positions[frame, 1],
+            self.positions[frame, 2],
+            -dx*3, -dy*3, -dz*3,
+            length=1.0,
+            color='black',
+            arrow_length_ratio=0.2
         )
 
         self.ax.legend()
@@ -89,35 +117,30 @@ if __name__ == "__main__":
     print(args)
 
     env = DroneEnv()
-    model = PPO("MlpPolicy", env, verbose=1)
-
-    checkpoint_callback = CheckpointCallback(
-        save_freq=50000,   
-        save_path="simulator/models/tmp",
-        name_prefix="model",
-        save_replay_buffer=True,
-        save_vecnormalize=True,
-    )
-
-    if args.is_training:
-        model.learn(total_timesteps=1000000, callback=checkpoint_callback)
-        model.save("test_model")
-    else:
-        model = PPO.load("simulator/models/ppo_drone_model")
+    
+    model = Agent(None)
+    model.load_state_dict(torch.load("ppo_6912000.pth"))
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
-    targets = [np.array(env.target)]
+    move_targets = [np.array(env.move_target)]
+    look_targets = [np.array(env.look_target)]
+    yaws = [np.array(env.yaw)]
 
     while True:
-        action, _ = model.predict(obs)
-        obs, reward, terminated, truncated, info = env.step(action)
+        action, _, _, _ = model.get_action_and_value(torch.tensor([obs], dtype=torch.float32))
+        print("action: ", action)
+        obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
-        targets.append(np.array(env.target))
+        move_targets.append(np.array(env.move_target))
+        look_targets.append(np.array(env.look_target))
+        yaws.append(np.array(env.yaw))
         if terminated or truncated:
             break
 
     positions = np.array(positions)
-    targets = np.array(targets)
+    move_targets = np.array(move_targets)
+    look_targets = np.array(look_targets)
+    yaws = np.array(yaws)
 
-    vis = Visualiser3D(positions, targets)
+    vis = Visualiser3D(positions, move_targets, look_targets, yaws)
