@@ -70,78 +70,78 @@ class DroneEnv(gym.Env):
         ):
             reward += 0.1
 
-        # Get normal vector of plane
-        collider_norm = np.cross(
-            self.colliders[0][1] - self.colliders[0][0],
-            self.colliders[0][2] - self.colliders[0][0],
-        )
-        # and normalise this to a unit vector
-        collider_norm = collider_norm / np.linalg.norm(collider_norm)
-
-        # full plane is ax+by+cz+d=0. a,b,c are components of norm
-        d = -np.dot(self.colliders[0][0], collider_norm)
-
-        # Get shortest distance from drone to point on full plane
-        dist_to_plane = np.abs(
-            collider_norm[0] * self.pos[0]
-            + collider_norm[1] * self.pos[1]
-            + collider_norm[2] * self.pos[2]
-            + d
-        ) / np.sqrt(np.sum(collider_norm**2))
-
-        # Get the closest point on the full plane
-        # The line connecting the drone and the closest point on
-        # the full plane is r=drone_pos+mu*plane_normal
-        mu = -(d + np.dot(collider_norm, self.pos)) / np.sum(collider_norm**2)
-        # then, the position on the full plane is:
-        point_on_plane = self.pos + mu * collider_norm
-
-        # Calculate vectors along sides of collider and from corner to point on plane
-        p = self.pos - self.colliders[0][0]
-        edges = [
-            self.colliders[0][1] - self.colliders[0][0],
-            self.colliders[0][3] - self.colliders[0][0],
-        ]
-
-        # Check if this point is already on the collider
-        if (0 < np.dot(p, edges[0]) < np.dot(edges[0], edges[0])) and (
-            0 < np.dot(p, edges[1]) < np.dot(edges[1], edges[1])
-        ):
-            closest_point = point_on_plane
-            closest_dist = dist_to_plane
-        else:
-            corner_dists = {
-                tuple(self.colliders[0][i]): np.linalg.norm(
-                    self.colliders[0][i] - point_on_plane
-                )
-                for i in range(0, 4)
-            }
-
-            # Closest side of the collider to the drone
-            closest_corners = list(
-                map(
-                    np.asarray, sorted(corner_dists, key=lambda k: corner_dists[k])[0:2]
-                )
+        for collider in self.colliders:
+            # Get normal vector of plane
+            collider_norm = np.cross(
+                collider[1] - collider[0],
+                collider[2] - collider[0],
             )
+            # and normalise this to a unit vector
+            collider_norm = collider_norm / np.linalg.norm(collider_norm)
 
-            # Vector along the closest edge of the collider
-            closest_edge = closest_corners[1] - closest_corners[0]
+            # full plane is ax+by+cz+d=0. a,b,c are components of norm
+            d = -np.dot(collider[0], collider_norm)
 
-            # Find the closest point to the drone on this collider edge
-            # Can calculate this point using the equation for a general point on
-            # the edge of the collider: r=corner+omega*closest_edge
-            # Hence, rearrange h = |r-p| where h is the distance in the plane
-            #
-            # TODO: (sam) explain the maths for this part better
-            omega = (
-                -np.dot(closest_edge, closest_corners[0] - point_on_plane)
-            ) / np.dot(closest_edge, closest_edge)
+            # Get shortest distance from drone to point on full plane
+            dist_to_plane = np.abs(
+                collider_norm[0] * self.pos[0]
+                + collider_norm[1] * self.pos[1]
+                + collider_norm[2] * self.pos[2]
+                + d
+            ) / np.sqrt(np.sum(collider_norm**2))
 
-            if omega < 0 or omega > 1:
-                omega = 0
+            # Get the closest point on the full plane
+            # The line connecting the drone and the closest point on
+            # the full plane is r=drone_pos+mu*plane_normal
+            mu = -(d + np.dot(collider_norm, self.pos)) / np.sum(collider_norm**2)
+            # then, the position on the full plane is:
+            point_on_plane = self.pos + mu * collider_norm
 
-            closest_point = closest_corners[0] + omega * closest_edge
-            closest_dist = np.linalg.norm(closest_point - self.pos)
+            # Calculate vectors along sides of collider and from corner to point on plane
+            p = self.pos - collider[0]
+            edges = [
+                collider[1] - collider[0],
+                collider[3] - collider[0],
+            ]
+
+            # Check if this point is already on the collider
+            if (0 < np.dot(p, edges[0]) < np.dot(edges[0], edges[0])) and (
+                0 < np.dot(p, edges[1]) < np.dot(edges[1], edges[1])
+            ):
+                closest_point = point_on_plane
+                closest_dist = dist_to_plane
+            else:
+                corner_dists = {
+                    tuple(collider[i]): np.linalg.norm(collider[i] - point_on_plane)
+                    for i in range(0, 4)
+                }
+
+                # Closest side of the collider to the drone
+                closest_corners = list(
+                    map(
+                        np.asarray,
+                        sorted(corner_dists, key=lambda k: corner_dists[k])[0:2],
+                    )
+                )
+
+                # Vector along the closest edge of the collider
+                closest_edge = closest_corners[1] - closest_corners[0]
+
+                # Find the closest point to the drone on this collider edge
+                # Can calculate this point using the equation for a general point on
+                # the edge of the collider: r=corner+omega*closest_edge
+                # Hence, rearrange h = |r-p| where h is the distance in the plane
+                #
+                # TODO: (sam) explain the maths for this part better
+                omega = (
+                    -np.dot(closest_edge, closest_corners[0] - point_on_plane)
+                ) / np.dot(closest_edge, closest_edge)
+
+                if omega < 0 or omega > 1:
+                    omega = 0
+
+                closest_point = closest_corners[0] + omega * closest_edge
+                closest_dist = np.linalg.norm(closest_point - self.pos)
 
         self.near_collision = closest_point
 
