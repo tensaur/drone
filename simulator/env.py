@@ -70,10 +70,6 @@ class DroneEnv(gym.Env):
         ):
             reward += 0.1
 
-        # Calculate the bounding box (min and max values for each axis)
-        p_min = np.min(self.colliders[0], axis=0)
-        p_max = np.max(self.colliders[0], axis=0)
-
         # Get normal vector of plane
         collider_norm = np.cross(
             self.colliders[0][1] - self.colliders[0][0],
@@ -111,7 +107,8 @@ class DroneEnv(gym.Env):
         if (0 < np.dot(p, edges[0]) < np.dot(edges[0], edges[0])) and (
             0 < np.dot(p, edges[1]) < np.dot(edges[1], edges[1])
         ):
-            closest_point, closest_dist = point_on_plane, dist_to_plane
+            closest_point = point_on_plane
+            closest_dist = dist_to_plane
         else:
             corner_dists = {
                 tuple(self.colliders[0][i]): np.linalg.norm(
@@ -130,21 +127,12 @@ class DroneEnv(gym.Env):
             # Vector along the closest edge of the collider
             closest_edge = closest_corners[1] - closest_corners[0]
 
-            # The height of the triangle joining the two closest corners of the collider
-            # and the closest point on the full plane to the drone. Uses h=2A/b where b is
-            # the base of the triangle which is the edge of the collider object, and A is the area.
-            # The area is calculated using A=0.5*ab*sin(theta)
-            a = closest_corners[0] - point_on_plane
-            b = closest_corners[1] - point_on_plane
-            theta = np.arccos(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-            A = 0.5 * np.linalg.norm(a) * np.linalg.norm(b) * np.sin(theta)
-            h = (2 * A) / np.linalg.norm(closest_edge)
-
-            # Find the closest point to the drone on this collider edge, using h
+            # Find the closest point to the drone on this collider edge
             # Can calculate this point using the equation for a general point on
             # the edge of the collider: r=corner+omega*closest_edge
-            # Hence, rearrange h = |r-p|
-            # TODO: (sam) explain maths for this part better
+            # Hence, rearrange h = |r-p| where h is the distance in the plane
+            #
+            # TODO: (sam) explain the maths for this part better
             omega = (
                 -np.dot(closest_edge, closest_corners[0] - point_on_plane)
             ) / np.dot(closest_edge, closest_edge)
@@ -155,19 +143,10 @@ class DroneEnv(gym.Env):
             closest_point = closest_corners[0] + omega * closest_edge
             closest_dist = np.linalg.norm(closest_point - self.pos)
 
-            # Verify answer is correct
-            # np.testing.assert_almost_equal(
-            #     closest_dist, np.sqrt(h**2 + dist_to_plane**2), decimal=10, verbose=True
-            # )
-
         self.near_collision = closest_point
 
-        # Check if the drone is inside the bounding box
-        if (
-            p_min[0] - 1 <= next_pos[0] <= p_max[0] + 1
-            and p_min[1] <= next_pos[1] <= p_max[1]
-            and p_min[2] <= next_pos[2] <= p_max[2]
-        ):
+        # TODO: change reward for collisions
+        if False:
             reward -= 1000
             truncated = True
 
@@ -198,7 +177,8 @@ class DroneEnv(gym.Env):
                 self.pos / 10,
                 [np.sin(self.yaw)],
                 [np.cos(self.yaw)],
-            )
+            ),
+            dtype=np.float32,
         )
 
     def render(self):
