@@ -23,7 +23,7 @@ class DroneEnv(gym.Env):
         self.look_target = np.random.randint(-10, 11, 3)
 
         self.dist_slice = []
-        self.dt = 10
+        self.dt = 3
 
         self.near_collision = np.array([0, 0, 0])
 
@@ -68,7 +68,7 @@ class DroneEnv(gym.Env):
         if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
             self.pos - self.move_target
         ):
-            reward += 0.1
+            reward += 0.05
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
@@ -155,14 +155,17 @@ class DroneEnv(gym.Env):
         if len(self.dist_slice) == self.dt:
             self.dist_slice.pop(0)
 
-        if np.max(self.dist_slice) < 5:
-            reward -= 0.2 + 0.1 * np.min(self.dist_slice)
+        if np.min(self.dist_slice) <= 0.2:
+            reward -= 0.25
+        elif 0.2 < np.min(self.dist_slice) < 0.4:
+            reward -= 0.1 + (np.min(self.dist_slice) / 2)
+            print(0.1 + (np.min(self.dist_slice) / 2))
 
         self.moves_left -= 1
         if self.moves_left == 0:
             truncated = True
 
-        reward -= 0.2
+        reward -= 0.1
 
         self.pos = next_pos
 

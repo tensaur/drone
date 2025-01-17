@@ -90,7 +90,7 @@ class Visualiser3D:
             -dy * 3,
             -dz * 3,
             length=1.0,
-            color="black",
+            color="green",
             arrow_length_ratio=0.2,
         )
 
@@ -102,15 +102,17 @@ class Visualiser3D:
             self.near_collisions[frame, 1] - self.positions[frame, 1],
             self.near_collisions[frame, 2] - self.positions[frame, 2],
             length=1.0,
-            color="red",
-            arrow_length_ratio=0.2,
+            color="black",
+            linestyles="dotted",
+            linewidths=0.8,
+            arrow_length_ratio=0,
         )
 
         self.ax.scatter(
             self.near_collisions[frame, 0],
             self.near_collisions[frame, 1],
             self.near_collisions[frame, 2],
-            color="blue",
+            color="black",
             s=100,
             marker="X",
             label="Closest Collision Point",
