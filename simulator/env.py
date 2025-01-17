@@ -70,7 +70,10 @@ class DroneEnv(gym.Env):
         ):
             reward += 0.1
 
-        for collider in self.colliders:
+        # distance, closest point, collider index
+        closest_collider = (np.inf, None, None)
+
+        for idx, collider in enumerate(self.colliders):
             # Get normal vector of plane
             collider_norm = np.cross(
                 collider[1] - collider[0],
@@ -143,12 +146,17 @@ class DroneEnv(gym.Env):
                 closest_point = closest_corners[0] + omega * closest_edge
                 closest_dist = np.linalg.norm(closest_point - self.pos)
 
-        self.near_collision = closest_point
+            if closest_dist < closest_collider[0]:
+                closest_collider = (closest_dist, closest_point, idx)
 
-        # TODO: change reward for collisions
-        if False:
-            reward -= 1000
-            truncated = True
+        self.near_collision = closest_collider[1]
+        self.dist_slice.append(closest_collider[0])
+
+        if len(self.dist_slice) == self.dt:
+            self.dist_slice.pop(0)
+
+        if np.max(self.dist_slice) < 5:
+            reward -= 0.2 + 0.1 * np.min(self.dist_slice)
 
         self.moves_left -= 1
         if self.moves_left == 0:
