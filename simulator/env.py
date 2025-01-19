@@ -69,7 +69,8 @@ class DroneEnv(gym.Env):
         if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
             self.pos - self.move_target
         ):
-            reward += 0.025
+            # reward += 0.025
+            pass
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
@@ -156,10 +157,12 @@ class DroneEnv(gym.Env):
         if len(self.dist_slice) - 1 == self.dt:
             self.dist_slice.pop(0)
 
-        if np.min(self.dist_slice) <= 0.2:
+        col_rad = 0.55
+
+        if np.min(self.dist_slice) <= col_rad:
             reward -= 0.25
-        elif 0.2 < np.min(self.dist_slice) < 0.4:
-            reward -= 0.1 + ((np.min(self.dist_slice) - 0.2) / 2)
+        elif col_rad < np.min(self.dist_slice) < col_rad + 0.2:
+            reward -= 0.1 + ((np.min(self.dist_slice) - col_rad) / 2)
 
         self.moves_left -= 1
         if self.moves_left == 0:

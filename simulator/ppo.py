@@ -105,22 +105,22 @@ class Agent(nn.Module):
         super().__init__()
         self.rpo_alpha = 0.5
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(8, 64)),
+            layer_init(nn.Linear(8, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
+            layer_init(nn.Linear(256, 1), std=1.0),
         )
         self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(8, 64)),
+            layer_init(nn.Linear(8, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
+            layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
-            layer_init(nn.Linear(64, 3), std=0.01),
+            layer_init(nn.Linear(256, 3), std=0.01),
         )
         self.actor_logstd = nn.Parameter(torch.zeros(1, 3))
 
@@ -199,6 +199,13 @@ if __name__ == "__main__":
     )
 
     agent = Agent(envs).to(device)
+
+    # TODO: (sam) integrate into loop at some point
+    try:
+        agent.load_state_dict(torch.load("start.pth"))
+    except FileNotFoundError:
+        print("No start.pth file provided - starting training from scratch.")
+
     # agent.actor = torch.compile(agent.actor, backend="eager")
     # agent.critic = torch.compile(agent.critic, backend="eager")
 
