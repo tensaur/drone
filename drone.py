@@ -16,7 +16,14 @@ mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 class Visualiser3D:
     def __init__(
-        self, positions, move_targets, look_targets, yaws, near_collisions, colliders=[]
+        self,
+        positions,
+        move_targets,
+        look_targets,
+        yaws,
+        near_collisions,
+        colliders=[],
+        rays=[],
     ):
         self.fig = plt.figure("Drone Simulation Tool for Warwick AI")
         self.ax = self.fig.add_subplot(projection="3d")
@@ -27,6 +34,7 @@ class Visualiser3D:
         self.yaws = yaws
         self.colliders = colliders
         self.near_collisions = near_collisions
+        self.rays = rays
 
         _ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
         plt.show()
@@ -118,7 +126,26 @@ class Visualiser3D:
             label="Closest Collision Point",
         )
 
-        self.ax.add_collection3d(Poly3DCollection(self.colliders))
+        for r in self.rays:
+            self.ax.quiver(
+                self.positions[frame, 0],
+                self.positions[frame, 1],
+                self.positions[frame, 2],
+                r[0],
+                r[1],
+                r[2],
+                length=1.0,
+                color="blue",
+                arrow_length_ratio=0.2,
+            )
+
+        poly3d = Poly3DCollection(self.colliders[6:])
+        poly3d.set_zsort("average")  # Important for depth ordering
+        poly3d.set_facecolor("gray")
+        poly3d.set_edgecolor("black")
+        poly3d.set_alpha(0.3)  # Slight transparency to see behind
+
+        self.ax.add_collection3d(poly3d)
 
         self.ax.legend(prop={"size": 7}, markerscale=0.6)
 
@@ -182,5 +209,11 @@ if __name__ == "__main__":
     near_collisions = np.array(near_collisions)
 
     vis = Visualiser3D(
-        positions, move_targets, look_targets, yaws, near_collisions, env.colliders
+        positions,
+        move_targets,
+        look_targets,
+        yaws,
+        near_collisions,
+        env.colliders,
+        env.rays,
     )

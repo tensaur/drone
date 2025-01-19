@@ -8,7 +8,7 @@ class DroneEnv(gym.Env):
         super(DroneEnv, self).__init__()
 
         self.observation_space = spaces.Box(
-            low=-1, high=1, shape=(8,), dtype=np.float32
+            low=-1, high=1, shape=(8 + 6,), dtype=np.float32
         )
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
@@ -27,13 +27,77 @@ class DroneEnv(gym.Env):
 
         self.near_collision = np.array([0, 0, 0])
 
+        angles = np.linspace(0, 2 * np.pi, 4, endpoint=False)
+        self.rays = np.unique(
+            np.array(
+                [
+                    [
+                        np.array([np.cos(angle), np.sin(angle), 0]).round(decimals=6)
+                        for angle in angles
+                    ],
+                    [
+                        np.array([0, np.cos(angle), np.sin(angle)]).round(decimals=6)
+                        for angle in angles
+                    ],
+                    [
+                        np.array([np.cos(angle), 0, np.sin(angle)]).round(decimals=6)
+                        for angle in angles
+                    ],
+                ]
+            ).reshape(-1, 3),
+            axis=0,
+        )
+        self.prod_totals = np.zeros(len(self.rays))
+
         self.colliders = [
             [
-                np.array([0, 0, 0]),
-                np.array([0, 10, 0]),
+                np.array([-10, -10, -10]),
+                np.array([10, -10, -10]),
+                np.array([10, -10, 10]),
+                np.array([-10, -10, 10]),
+            ],
+            [
+                np.array([10, -10, -10]),
+                np.array([10, 10, -10]),
+                np.array([10, 10, 10]),
+                np.array([10, -10, 10]),
+            ],
+            [
+                np.array([10, 10, -10]),
+                np.array([10, 10, 10]),
+                np.array([-10, 10, 10]),
+                np.array([-10, 10, -10]),
+            ],
+            [
+                np.array([-10, 10, -10]),
+                np.array([-10, 10, 10]),
+                np.array([-10, -10, 10]),
+                np.array([-10, -10, -10]),
+            ],
+            [
+                np.array([-10, -10, 10]),
+                np.array([10, -10, 10]),
+                np.array([10, 10, 10]),
+                np.array([-10, 10, 10]),
+            ],
+            [
+                np.array([-10, -10, -10]),
+                np.array([10, -10, -10]),
+                np.array([10, 10, -10]),
+                np.array([-10, 10, -10]),
+            ],
+            [
+                np.array([0, 0, -5]),
+                np.array([0, 10, -5]),
                 np.array([0, 10, 10]),
                 np.array([0, 0, 10]),
-            ]
+            ],
+            [
+                np.array([0, 0, 5]),
+                np.array([0, -10, 5]),
+                np.array([0, -10, -10]),
+                np.array([0, 0, -10]),
+            ],
         ]
 
         observation = self.get_observation()
@@ -58,7 +122,7 @@ class DroneEnv(gym.Env):
         vel = np.dot(rotation_matrix, action) * 0.1
         next_pos = np.clip(self.pos + vel, -10, 10)
 
-        if np.linalg.norm(next_pos - self.move_target) < 2:
+        if np.linalg.norm(next_pos - self.move_target) < 1:
             reward += 1.0
             self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
@@ -74,6 +138,7 @@ class DroneEnv(gym.Env):
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
+        self.prod_totals = np.zeros(len(self.rays))
 
         for idx, collider in enumerate(self.colliders):
             # Get normal vector of plane
@@ -89,21 +154,21 @@ class DroneEnv(gym.Env):
 
             # Get shortest distance from drone to point on full plane
             dist_to_plane = np.abs(
-                collider_norm[0] * self.pos[0]
-                + collider_norm[1] * self.pos[1]
-                + collider_norm[2] * self.pos[2]
+                collider_norm[0] * next_pos[0]
+                + collider_norm[1] * next_pos[1]
+                + collider_norm[2] * next_pos[2]
                 + d
             ) / np.sqrt(np.sum(collider_norm**2))
 
             # Get the closest point on the full plane
             # The line connecting the drone and the closest point on
             # the full plane is r=drone_pos+mu*plane_normal
-            mu = -(d + np.dot(collider_norm, self.pos)) / np.sum(collider_norm**2)
+            mu = -(d + np.dot(collider_norm, next_pos)) / np.sum(collider_norm**2)
             # then, the position on the full plane is:
-            point_on_plane = self.pos + mu * collider_norm
+            point_on_plane = next_pos + mu * collider_norm
 
             # Calculate vectors along sides of collider and from corner to point on plane
-            p = self.pos - collider[0]
+            p = next_pos - collider[0]
             edges = [
                 collider[1] - collider[0],
                 collider[3] - collider[0],
@@ -146,10 +211,19 @@ class DroneEnv(gym.Env):
                     omega = 0
 
                 closest_point = closest_corners[0] + omega * closest_edge
-                closest_dist = np.linalg.norm(closest_point - self.pos)
+                closest_dist = np.linalg.norm(closest_point - next_pos)
 
             if closest_dist < closest_collider[0]:
                 closest_collider = (closest_dist, closest_point, idx)
+
+            for r, ray in enumerate(self.rays):
+                dir_unit = (closest_point - next_pos) / np.linalg.norm(
+                    closest_point - next_pos
+                )
+
+                projection = np.clip(np.dot(ray, dir_unit), 0, 1)
+                if (projection > self.prod_totals[r]) and closest_dist < 1:
+                    self.prod_totals[r] = projection * (1 - closest_dist)
 
         self.near_collision = closest_collider[1]
         self.dist_slice.append(closest_collider[0])
@@ -191,6 +265,7 @@ class DroneEnv(gym.Env):
                 self.pos / 10,
                 [np.sin(self.yaw)],
                 [np.cos(self.yaw)],
+                self.prod_totals,
             ),
             dtype=np.float32,
         )

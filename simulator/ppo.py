@@ -105,7 +105,7 @@ class Agent(nn.Module):
         super().__init__()
         self.rpo_alpha = 0.5
         self.critic = nn.Sequential(
-            layer_init(nn.Linear(8, 256)),
+            layer_init(nn.Linear(14, 256)),
             nn.Tanh(),
             layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
@@ -114,7 +114,7 @@ class Agent(nn.Module):
             layer_init(nn.Linear(256, 1), std=1.0),
         )
         self.actor_mean = nn.Sequential(
-            layer_init(nn.Linear(8, 256)),
+            layer_init(nn.Linear(14, 256)),
             nn.Tanh(),
             layer_init(nn.Linear(256, 256)),
             nn.Tanh(),
