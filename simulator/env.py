@@ -12,9 +12,9 @@ class DroneEnv(gym.Env):
         )
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
-    def reset(self, n_targets=5, seed=None, options=None):
+    def reset(self, n_targets=50, seed=None, options=None):
         self.n_targets = n_targets
-        self.moves_left = 500
+        self.moves_left = 1500
 
         self.pos = np.random.randint(-10, 11, 3)
         self.yaw = 0
@@ -23,7 +23,7 @@ class DroneEnv(gym.Env):
         self.look_target = np.random.randint(-10, 11, 3)
 
         self.dist_slice = []
-        self.dt = 3
+        self.dt = 1
 
         self.near_collision = np.array([0, 0, 0])
 
@@ -63,12 +63,13 @@ class DroneEnv(gym.Env):
             self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
             if self.n_targets == 0:
-                terminated = True
+                pass
+                # terminated = True
 
         if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
             self.pos - self.move_target
         ):
-            reward += 0.05
+            reward += 0.025
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
@@ -152,30 +153,29 @@ class DroneEnv(gym.Env):
         self.near_collision = closest_collider[1]
         self.dist_slice.append(closest_collider[0])
 
-        if len(self.dist_slice) == self.dt:
+        if len(self.dist_slice) - 1 == self.dt:
             self.dist_slice.pop(0)
 
         if np.min(self.dist_slice) <= 0.2:
             reward -= 0.25
         elif 0.2 < np.min(self.dist_slice) < 0.4:
-            reward -= 0.1 + (np.min(self.dist_slice) / 2)
-            print(0.1 + (np.min(self.dist_slice) / 2))
+            reward -= 0.1 + ((np.min(self.dist_slice) - 0.2) / 2)
 
         self.moves_left -= 1
         if self.moves_left == 0:
             truncated = True
 
-        reward -= 0.1
+        # reward -= 0.1
 
         self.pos = next_pos
 
         # randomise yaw and look target -> learns to move towards look target regardless of yaw
-        # self.yaw = np.random.rand() * 2 * np.pi  # (self.yaw + 0.1) % (2 * np.pi)
-        # self.look_target = np.random.randint(-10, 11, 3)
-        self.look_target = np.clip(self.look_target + (np.random.randn(3) / 5), -10, 10)
-        self.yaw = np.arctan2(
-            self.pos[1] - self.look_target[1], self.pos[0] - self.look_target[0]
-        )
+        self.yaw = np.random.rand() * 2 * np.pi  # (self.yaw + 0.1) % (2 * np.pi)
+        self.look_target = np.random.randint(-10, 11, 3)
+        # self.look_target = np.clip(self.look_target + (np.random.randn(3) / 5), -10, 10)
+        # self.yaw = np.arctan2(
+        #     self.pos[1] - self.look_target[1], self.pos[0] - self.look_target[0]
+        # )
 
         observation = self.get_observation()
 
