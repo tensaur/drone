@@ -274,13 +274,15 @@ if __name__ == "__main__":
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
-            if "episode" in infos:
-                for i in range(args.num_envs):
-                    if infos["episode"]["_r"][i]:
-                        #print("thing")
-                        #print(f"global_step={global_step}, episodic_return={infos['episode']['r'][i]}")
-                        writer.add_scalar("charts/episodic_return", infos["episode"]["r"][i], global_step)
-                        writer.add_scalar("charts/episodic_length", infos["episode"]["l"][i], global_step)
+            if "final_info" in infos:
+                for info in infos["final_info"]:
+                    if info and "episode" in info:
+                        writer.add_scalar(
+                            "charts/episodic_return", info["episode"]["r"], global_step
+                        )
+                        writer.add_scalar(
+                            "charts/episodic_length", info["episode"]["l"], global_step
+                        )
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -391,7 +393,7 @@ if __name__ == "__main__":
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
         if iteration % 100 == 0:
-            torch.save(agent.state_dict(), f'./models/ppo_{global_step}.pth')
+            torch.save(agent.state_dict(), f'ppo_{global_step}.pth')
 
     envs.close()
     writer.close()
