@@ -15,7 +15,16 @@ mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 
 class Visualiser3D:
-    def __init__(self, positions, move_targets, look_targets, yaws, colliders=[]):
+    def __init__(
+        self,
+        positions,
+        move_targets,
+        look_targets,
+        yaws,
+        near_collisions,
+        colliders=[],
+        rays=[],
+    ):
         self.fig = plt.figure("Drone Simulation Tool for Warwick AI")
         self.ax = self.fig.add_subplot(projection="3d")
 
@@ -24,8 +33,10 @@ class Visualiser3D:
         self.look_targets = look_targets
         self.yaws = yaws
         self.colliders = colliders
+        self.near_collisions = near_collisions
+        self.rays = rays
 
-        ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
+        _ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
         plt.show()
 
     def update(self, frame):
@@ -37,8 +48,6 @@ class Visualiser3D:
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.set_zlabel("Z")
-
-        self.ax.add_collection3d(Poly3DCollection(self.colliders))
 
         self.ax.plot(
             self.positions[:frame, 0],
@@ -89,11 +98,56 @@ class Visualiser3D:
             -dy * 3,
             -dz * 3,
             length=1.0,
-            color="black",
+            color="green",
             arrow_length_ratio=0.2,
         )
 
-        self.ax.legend()
+        self.ax.quiver(
+            self.positions[frame, 0],
+            self.positions[frame, 1],
+            self.positions[frame, 2],
+            self.near_collisions[frame, 0] - self.positions[frame, 0],
+            self.near_collisions[frame, 1] - self.positions[frame, 1],
+            self.near_collisions[frame, 2] - self.positions[frame, 2],
+            length=1.0,
+            color="black",
+            linestyles="dotted",
+            linewidths=0.8,
+            arrow_length_ratio=0,
+        )
+
+        self.ax.scatter(
+            self.near_collisions[frame, 0],
+            self.near_collisions[frame, 1],
+            self.near_collisions[frame, 2],
+            color="black",
+            s=100,
+            marker="X",
+            label="Closest Collision Point",
+        )
+
+        for r in self.rays:
+            self.ax.quiver(
+                self.positions[frame, 0],
+                self.positions[frame, 1],
+                self.positions[frame, 2],
+                r[0],
+                r[1],
+                r[2],
+                length=1.0,
+                color="blue",
+                arrow_length_ratio=0.2,
+            )
+
+        poly3d = Poly3DCollection(self.colliders[6:])
+        poly3d.set_zsort("average")  # Important for depth ordering
+        poly3d.set_facecolor("gray")
+        poly3d.set_edgecolor("black")
+        poly3d.set_alpha(0.3)  # Slight transparency to see behind
+
+        self.ax.add_collection3d(poly3d)
+
+        self.ax.legend(prop={"size": 7}, markerscale=0.6)
 
 
 """ 
@@ -126,13 +180,14 @@ if __name__ == "__main__":
 
     env = DroneEnv()
     model = Agent(None)
-    model.load_state_dict(torch.load("ppo_4096000.pth"))
+    model.load_state_dict(torch.load("ppo_9984000.pth"))
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
     move_targets = [np.array(env.move_target)]
     look_targets = [np.array(env.look_target)]
     yaws = [np.array(env.yaw)]
+    near_collisions = [np.array(env.near_collision)]
 
     while True:
         action, _, _, _ = model.get_action_and_value(
@@ -143,6 +198,7 @@ if __name__ == "__main__":
         move_targets.append(np.array(env.move_target))
         look_targets.append(np.array(env.look_target))
         yaws.append(np.array(env.yaw))
+        near_collisions.append(np.array(env.near_collision))
         if terminated or truncated:
             break
 
@@ -150,5 +206,14 @@ if __name__ == "__main__":
     move_targets = np.array(move_targets)
     look_targets = np.array(look_targets)
     yaws = np.array(yaws)
+    near_collisions = np.array(near_collisions)
 
-    vis = Visualiser3D(positions, move_targets, look_targets, yaws, env.colliders)
+    vis = Visualiser3D(
+        positions,
+        move_targets,
+        look_targets,
+        yaws,
+        near_collisions,
+        env.colliders,
+        env.rays,
+    )
