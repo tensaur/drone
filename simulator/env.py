@@ -133,7 +133,7 @@ class DroneEnv(gym.Env):
         if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
             self.pos - self.move_target
         ):
-            # reward += 0.025
+            reward += 0.025
             pass
 
         # distance, closest point, collider index

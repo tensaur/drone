@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from simulator.ppo import Agent
+from simulator.lstm_ppo import Agent
 from simulator.env import DroneEnv
 
 import torch
@@ -180,7 +180,12 @@ if __name__ == "__main__":
 
     env = DroneEnv()
     model = Agent(None)
-    model.load_state_dict(torch.load("end.pth"))
+    model.load_state_dict(torch.load("ppo_4300800.pth"))
+
+    lstm_state = (
+        torch.zeros(model.lstm.num_layers, 1, model.lstm.hidden_size),
+        torch.zeros(model.lstm.num_layers, 1, model.lstm.hidden_size),
+    )
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
@@ -190,9 +195,8 @@ if __name__ == "__main__":
     near_collisions = [np.array(env.near_collision)]
 
     while True:
-        action, _, _, _ = model.get_action_and_value(
-            torch.tensor([obs], dtype=torch.float32)
-        )
+        action, _, _, _, lstm_state = model.get_action_and_value(torch.tensor([obs]), lstm_state, torch.tensor([0]))
+
         obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
         move_targets.append(np.array(env.move_target))
