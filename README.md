@@ -44,6 +44,10 @@ uv run simulator/ppo.py --track --wandb-project-name drone --env_id DroneEnv-v0
 
 ## Demo
 
+### v1
+https://github.com/user-attachments/assets/3d69e843-65ed-408c-babf-2f3479b6f822
+
+### v0
 https://github.com/user-attachments/assets/61bc5123-0672-4d17-a7b8-b957a7c77f19
 
 ## Contributing
