@@ -12,7 +12,10 @@ class DroneEnv(gym.Env):
         )
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
-    def reset(self, n_targets=50, seed=None, options=None):
+        # ensures that mesh always fits in 10 by 10 grid for viewing
+        self.scale = 1
+
+    def reset(self, n_targets=50, seed=None, options=None, colliders=None):
         self.n_targets = n_targets
         self.moves_left = 1500
 
@@ -49,56 +52,68 @@ class DroneEnv(gym.Env):
         )
         self.prod_totals = np.zeros(len(self.rays))
 
-        self.colliders = [
-            [
-                np.array([-10, -10, -10]),
-                np.array([10, -10, -10]),
-                np.array([10, -10, 10]),
-                np.array([-10, -10, 10]),
-            ],
-            [
-                np.array([10, -10, -10]),
-                np.array([10, 10, -10]),
-                np.array([10, 10, 10]),
-                np.array([10, -10, 10]),
-            ],
-            [
-                np.array([10, 10, -10]),
-                np.array([10, 10, 10]),
-                np.array([-10, 10, 10]),
-                np.array([-10, 10, -10]),
-            ],
-            [
-                np.array([-10, 10, -10]),
-                np.array([-10, 10, 10]),
-                np.array([-10, -10, 10]),
-                np.array([-10, -10, -10]),
-            ],
-            [
-                np.array([-10, -10, 10]),
-                np.array([10, -10, 10]),
-                np.array([10, 10, 10]),
-                np.array([-10, 10, 10]),
-            ],
-            [
-                np.array([-10, -10, -10]),
-                np.array([10, -10, -10]),
-                np.array([10, 10, -10]),
-                np.array([-10, 10, -10]),
-            ],
-            [
-                np.array([0, 0, -5]),
-                np.array([0, 10, -5]),
-                np.array([0, 10, 10]),
-                np.array([0, 0, 10]),
-            ],
-            [
-                np.array([0, 0, 5]),
-                np.array([0, -10, 5]),
-                np.array([0, -10, -10]),
-                np.array([0, 0, -10]),
-            ],
-        ]
+        if colliders is None:
+            self.colliders = [
+                [
+                    np.array([-10, -10, -10]),
+                    np.array([10, -10, -10]),
+                    np.array([10, -10, 10]),
+                    np.array([-10, -10, 10]),
+                ],
+                [
+                    np.array([10, -10, -10]),
+                    np.array([10, 10, -10]),
+                    np.array([10, 10, 10]),
+                    np.array([10, -10, 10]),
+                ],
+                [
+                    np.array([10, 10, -10]),
+                    np.array([10, 10, 10]),
+                    np.array([-10, 10, 10]),
+                    np.array([-10, 10, -10]),
+                ],
+                [
+                    np.array([-10, 10, -10]),
+                    np.array([-10, 10, 10]),
+                    np.array([-10, -10, 10]),
+                    np.array([-10, -10, -10]),
+                ],
+                [
+                    np.array([-10, -10, 10]),
+                    np.array([10, -10, 10]),
+                    np.array([10, 10, 10]),
+                    np.array([-10, 10, 10]),
+                ],
+                [
+                    np.array([-10, -10, -10]),
+                    np.array([10, -10, -10]),
+                    np.array([10, 10, -10]),
+                    np.array([-10, 10, -10]),
+                ],
+                [
+                    np.array([0, 0, -5]),
+                    np.array([0, 10, -5]),
+                    np.array([0, 10, 10]),
+                    np.array([0, 0, 10]),
+                ],
+                [
+                    np.array([0, 0, 5]),
+                    np.array([0, -10, 5]),
+                    np.array([0, -10, -10]),
+                    np.array([0, 0, -10]),
+                ],
+            ]
+        else:
+            all_points = colliders.reshape(-1, 3)
+            min_point = np.min(all_points, axis=0)
+            max_point = np.max(all_points, axis=0)
+            center = (min_point + max_point) / 2
+
+            size = max_point - min_point  # Width, height, depth
+            max_size = np.max(size)  # Largest dimension
+            scale = 10 / max_size
+
+            self.colliders = (colliders - center) * scale * 2
 
         observation = self.get_observation()
         return observation, {}

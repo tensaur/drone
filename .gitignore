@@ -3,3 +3,4 @@ venv/
 wandb/
 runs/
 *.pth
+*.ply

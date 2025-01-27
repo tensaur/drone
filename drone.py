@@ -11,6 +11,8 @@ from simulator.env import DroneEnv
 
 import torch
 
+from room_mesher import mesh
+
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 
@@ -27,6 +29,8 @@ class Visualiser3D:
     ):
         self.fig = plt.figure("Drone Simulation Tool for Warwick AI")
         self.ax = self.fig.add_subplot(projection="3d")
+        elev, azim, roll = 0, 0, 0
+        self.ax.view_init(elev, azim, roll)
 
         self.positions = positions
         self.move_targets = move_targets
@@ -42,12 +46,12 @@ class Visualiser3D:
     def update(self, frame):
         self.ax.clear()
 
+        #self.ax.set_xlabel("X")
+        #self.ax.set_ylabel("Y")
+        #self.ax.set_zlabel("Z")
         self.ax.set_xlim([-10, 10])
         self.ax.set_ylim([-10, 10])
         self.ax.set_zlim([-10, 10])
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-        self.ax.set_zlabel("Z")
 
         self.ax.plot(
             self.positions[:frame, 0],
@@ -139,7 +143,7 @@ class Visualiser3D:
                 arrow_length_ratio=0.2,
             )
 
-        poly3d = Poly3DCollection(self.colliders[6:])
+        poly3d = Poly3DCollection(self.colliders)
         poly3d.set_zsort("average")  # Important for depth ordering
         poly3d.set_facecolor("gray")
         poly3d.set_edgecolor("black")
@@ -174,15 +178,23 @@ if __name__ == "__main__":
         type=int,
         default=5,
     )
+    cmd.add_argument(
+        "-r",
+        "--room-path",
+        help="Path to .ply file containing room point cloud",
+        dest="r",
+        type=str,
+        default=None,
+    )
 
     args = cmd.parse_args()
     print(args)
 
     env = DroneEnv()
     model = Agent(None)
-    model.load_state_dict(torch.load("ppo_9984000.pth"))
+    model.load_state_dict(torch.load("end.pth"))
 
-    obs, _ = env.reset(n_targets=args.n)
+    obs, _ = env.reset(n_targets=args.n, colliders=mesh(args.r) if args.r else None)
     positions = [np.array(env.pos)]
     move_targets = [np.array(env.move_target)]
     look_targets = [np.array(env.look_target)]
