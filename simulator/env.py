@@ -13,14 +13,12 @@ class DroneEnv(gym.Env):
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
         # ensures that mesh always fits in 10 by 10 grid for viewing
-        self.scale = 1
+        self.scale = 10
+        self.center = np.zeros(3)
 
     def reset(self, n_targets=50, seed=None, options=None, colliders=None):
         self.n_targets = n_targets
         self.moves_left = 1500
-
-        self.pos = np.random.randint(-10, 11, 3)
-        self.yaw = 0
 
         self.move_target = np.random.randint(-10, 11, 3)
         self.look_target = np.random.randint(-10, 11, 3)
@@ -107,13 +105,18 @@ class DroneEnv(gym.Env):
             all_points = colliders.reshape(-1, 3)
             min_point = np.min(all_points, axis=0)
             max_point = np.max(all_points, axis=0)
-            center = (min_point + max_point) / 2
+            self.center = (min_point + max_point) / 2
 
             size = max_point - min_point  # Width, height, depth
             max_size = np.max(size)  # Largest dimension
-            scale = 10 / max_size
+            self.scale = 10 / max_size
 
-            self.colliders = (colliders - center) * scale * 2
+            self.colliders = (colliders - self.center) * self.scale * 2
+            #self.colliders = colliders * self.scale
+        
+        self.pos = -self.center * self.scale * 2 + np.array([-10,0,0])
+        self.move_target = self.pos - np.array([0,10,0])
+        self.yaw = 0
 
         observation = self.get_observation()
         return observation, {}
@@ -139,7 +142,7 @@ class DroneEnv(gym.Env):
 
         if np.linalg.norm(next_pos - self.move_target) < 1:
             reward += 1.0
-            self.move_target = np.random.randint(-10, 11, 3)
+            #self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
             if self.n_targets == 0:
                 pass

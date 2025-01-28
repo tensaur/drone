@@ -6,10 +6,12 @@ readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.12"
 dependencies = [
+    "djitellopy>=2.5.0",
     "gymnasium<1.0.0",
     "matplotlib>=3.10.0",
     "numpy>=2.2.1",
     "open3d>=0.19.0",
+    "pygame>=2.6.1",
     "stable-baselines3>=2.0.0",
     "tensorboard>=2.18.0",
     "torch>=2.5.1",
