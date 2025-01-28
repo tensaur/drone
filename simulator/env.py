@@ -215,9 +215,12 @@ class DroneEnv(gym.Env):
                 closest_collider = (closest_dist, closest_point, idx)
 
             for r, ray in enumerate(self.rays):
-                dir_unit = (closest_point - next_pos) / np.linalg.norm(
-                    closest_point - next_pos
-                )
+                if np.isclose(closest_point, next_pos).all():
+                    dir_unit = np.zeros(3)
+                else:
+                    dir_unit = (closest_point - next_pos) / np.linalg.norm(
+                        closest_point - next_pos
+                    )
 
                 projection = np.clip(dot(ray, dir_unit), 0, 1)
                 if (projection > self.prod_totals[r]) and closest_dist < 1:
