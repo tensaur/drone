@@ -3,6 +3,10 @@ import gymnasium as gym
 from gymnasium import spaces
 
 
+def dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
 class DroneEnv(gym.Env):
     def __init__(self):
         super(DroneEnv, self).__init__()
@@ -93,8 +97,8 @@ class DroneEnv(gym.Env):
                 np.array([0, 0, 10]),
             ],
             [
-                np.array([0, 0, 5]),
-                np.array([0, -10, 5]),
+                np.array([0, 0, -5]),
+                np.array([0, -10, -5]),
                 np.array([0, -10, -10]),
                 np.array([0, 0, -10]),
             ],
@@ -119,7 +123,7 @@ class DroneEnv(gym.Env):
             ]
         )
 
-        vel = np.dot(rotation_matrix, action) * 0.1
+        vel = dot(rotation_matrix, action) * 0.1
         next_pos = np.clip(self.pos + vel, -10, 10)
 
         if np.linalg.norm(next_pos - self.move_target) < 1:
@@ -129,12 +133,6 @@ class DroneEnv(gym.Env):
             if self.n_targets == 0:
                 pass
                 # terminated = True
-
-        if np.linalg.norm(next_pos - self.move_target) < np.linalg.norm(
-            self.pos - self.move_target
-        ):
-            # reward += 0.025
-            pass
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
@@ -150,7 +148,7 @@ class DroneEnv(gym.Env):
             collider_norm = collider_norm / np.linalg.norm(collider_norm)
 
             # full plane is ax+by+cz+d=0. a,b,c are components of norm
-            d = -np.dot(collider[0], collider_norm)
+            d = -dot(collider[0], collider_norm)
 
             # Get shortest distance from drone to point on full plane
             dist_to_plane = np.abs(
@@ -163,7 +161,7 @@ class DroneEnv(gym.Env):
             # Get the closest point on the full plane
             # The line connecting the drone and the closest point on
             # the full plane is r=drone_pos+mu*plane_normal
-            mu = -(d + np.dot(collider_norm, next_pos)) / np.sum(collider_norm**2)
+            mu = -(d + dot(collider_norm, next_pos)) / np.sum(collider_norm**2)
             # then, the position on the full plane is:
             point_on_plane = next_pos + mu * collider_norm
 
@@ -175,8 +173,8 @@ class DroneEnv(gym.Env):
             ]
 
             # Check if this point is already on the collider
-            if (0 < np.dot(p, edges[0]) < np.dot(edges[0], edges[0])) and (
-                0 < np.dot(p, edges[1]) < np.dot(edges[1], edges[1])
+            if (0 < dot(p, edges[0]) < dot(edges[0], edges[0])) and (
+                0 < dot(p, edges[1]) < dot(edges[1], edges[1])
             ):
                 closest_point = point_on_plane
                 closest_dist = dist_to_plane
@@ -203,9 +201,9 @@ class DroneEnv(gym.Env):
                 # Hence, rearrange h = |r-p| where h is the distance in the plane
                 #
                 # TODO: (sam) explain the maths for this part better
-                omega = (
-                    -np.dot(closest_edge, closest_corners[0] - point_on_plane)
-                ) / np.dot(closest_edge, closest_edge)
+                omega = (-dot(closest_edge, closest_corners[0] - point_on_plane)) / dot(
+                    closest_edge, closest_edge
+                )
 
                 if omega < 0 or omega > 1:
                     omega = 0
@@ -221,7 +219,7 @@ class DroneEnv(gym.Env):
                     closest_point - next_pos
                 )
 
-                projection = np.clip(np.dot(ray, dir_unit), 0, 1)
+                projection = np.clip(dot(ray, dir_unit), 0, 1)
                 if (projection > self.prod_totals[r]) and closest_dist < 1:
                     self.prod_totals[r] = projection * (1 - closest_dist)
 
@@ -248,7 +246,6 @@ class DroneEnv(gym.Env):
 
         # randomise yaw and look target -> learns to move towards look target regardless of yaw
         self.yaw = np.random.rand() * 2 * np.pi  # (self.yaw + 0.1) % (2 * np.pi)
-        self.look_target = np.random.randint(-10, 11, 3)
         # self.look_target = np.clip(self.look_target + (np.random.randn(3) / 5), -10, 10)
         # self.yaw = np.arctan2(
         #     self.pos[1] - self.look_target[1], self.pos[0] - self.look_target[0]
