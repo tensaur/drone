@@ -139,7 +139,7 @@ class DroneEnv(gym.Env):
 
         # Non-sparse reward (optional)
         if dist_to_target < self.closest:
-            reward += self.closest - dist_to_target
+            reward += 0.1
             self.closest = dist_to_target
 
         # distance, closest point, collider index
@@ -251,7 +251,7 @@ class DroneEnv(gym.Env):
         if self.moves_left == 0:
             truncated = True
 
-        reward -= 0.1
+        reward -= 0.2
 
         self.pos = next_pos
 
