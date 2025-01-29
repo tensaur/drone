@@ -25,7 +25,6 @@ class DroneEnv(gym.Env):
 
         self.move_target = np.random.randint(-10, 11, 3)
         self.look_target = np.random.randint(-10, 11, 3)
-        self.closest = np.linalg.norm(self.move_target - self.pos)
 
         self.dist_slice = []
         self.dt = 1
@@ -131,16 +130,14 @@ class DroneEnv(gym.Env):
             reward += 1.0
             self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
-            self.closest = np.linalg.norm(self.move_target - next_pos)
             if self.n_targets == 0:
                 terminated = True
 
-        dist_to_target = np.linalg.norm(self.move_target - next_pos)
-
         # Non-sparse reward (optional)
-        if dist_to_target < self.closest:
+        if np.linalg.norm(self.move_target - next_pos) < np.linalg.norm(
+            self.move_target - self.pos
+        ):
             reward += 0.1
-            self.closest = dist_to_target
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
