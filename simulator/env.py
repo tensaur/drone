@@ -16,7 +16,7 @@ class DroneEnv(gym.Env):
         )
         self.action_space = spaces.Box(low=-1, high=1, shape=(3,), dtype=np.float32)
 
-    def reset(self, n_targets=50, seed=None, options=None):
+    def reset(self, n_targets=5, seed=None, options=None):
         self.n_targets = n_targets
         self.moves_left = 1500
 
@@ -25,6 +25,7 @@ class DroneEnv(gym.Env):
 
         self.move_target = np.random.randint(-10, 11, 3)
         self.look_target = np.random.randint(-10, 11, 3)
+        self.closest = np.linalg.norm(self.move_target - self.pos)
 
         self.dist_slice = []
         self.dt = 1
@@ -130,9 +131,16 @@ class DroneEnv(gym.Env):
             reward += 1.0
             self.move_target = np.random.randint(-10, 11, 3)
             self.n_targets -= 1
+            self.closest = np.linalg.norm(self.move_target - next_pos)
             if self.n_targets == 0:
-                pass
-                # terminated = True
+                terminated = True
+
+        dist_to_target = np.linalg.norm(self.move_target - next_pos)
+
+        # Non-sparse reward (optional)
+        if dist_to_target < self.closest:
+            reward += self.closest - dist_to_target
+            self.closest = dist_to_target
 
         # distance, closest point, collider index
         closest_collider = (np.inf, None, None)
@@ -243,7 +251,7 @@ class DroneEnv(gym.Env):
         if self.moves_left == 0:
             truncated = True
 
-        # reward -= 0.1
+        reward -= 0.1
 
         self.pos = next_pos
 

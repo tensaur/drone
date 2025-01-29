@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
     env = DroneEnv()
     model = Agent(None)
-    model.load_state_dict(torch.load("ppo_9984000.pth"))
+    model.load_state_dict(torch.load("ppo_40704000.pth"))
 
     obs, _ = env.reset(n_targets=args.n)
     positions = [np.array(env.pos)]
