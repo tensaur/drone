@@ -2,4 +2,6 @@ venv/
 **/__pycache__
 wandb/
 runs/
+build/
+*.so
 *.pth

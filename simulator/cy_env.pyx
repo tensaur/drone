@@ -1,0 +1,77 @@
+cimport numpy as cnp
+from libc.stdlib cimport calloc, free
+import os
+
+cdef extern from "env.h":
+    int LOG_BUFFER_SIZE
+    int GRID_SIZE
+
+    ctypedef struct Log:
+        float episode_return
+        float episode_length
+        float score
+
+    ctypedef struct LogBuffer
+    LogBuffer* allocate_logbuffer(int)
+    void free_logbuffer(LogBuffer*)
+    Log aggregate_and_clear(LogBuffer*)
+
+    ctypedef struct Drone:
+        float* observations;
+        float* actions;
+        float* rewards;
+        unsigned char* terminals;
+        LogBuffer* log_buffer;
+        Log log;
+        int tick;
+        int n_targets;
+        int moves_left;
+        float pos[3];
+        float yaw;
+        float move_target[3];
+        float look_target[3];
+
+    void init(Drone* env)
+    void c_reset(Drone* env)
+    void c_step(Drone* env)
+
+cdef class CyDrone:
+    cdef:
+        Drone* envs
+        LogBuffer* logs
+        int num_envs
+
+    def __init__(self, float[:, :] observations, float[:] actions,
+                 float[:] rewards, unsigned char[:] terminals, int num_envs):
+        self.num_envs = num_envs;
+        self.envs = <Drone*> calloc(num_envs, sizeof(Drone));
+        self.logs = allocate_logbuffer(LOG_BUFFER_SIZE);
+
+        cdef int i;
+        for i in range(num_envs):
+            self.envs[i] = Drone(
+                observations = &observations[i, 0],
+                actions = &actions[i],
+                rewards = &rewards[i],
+                terminals = &terminals[i],
+                log_buffer=self.logs,
+            );
+            init(&self.envs[i])
+
+    def reset(self):
+        cdef int i;
+        for i in range(self.num_envs):
+            c_reset(&self.envs[i])
+
+    def step(self):
+        cdef int i;
+        for i in range(self.num_envs):
+            c_step(&self.envs[i])
+
+    def close(self):
+        free(self.envs)
+        free(self.logs)
+
+    def log(self):
+        cdef Log log = aggregate_and_clear(self.logs)
+        return log
