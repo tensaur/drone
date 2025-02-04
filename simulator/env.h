@@ -9,7 +9,7 @@
 // ------------------------------------------------------------
 // Logging functions for training loop
 // ------------------------------------------------------------
-#define LOG_BUFFER_SIZE 1024
+#define LOG_BUFFER_SIZE 4096
 
 typedef struct Log Log;
 struct Log {
@@ -232,7 +232,7 @@ void c_step(Drone *env) {
       env->actions[0] * cos(env->yaw) - env->actions[1] * sin(env->yaw);
   env->vel[1] =
       env->actions[0] * sin(env->yaw) + env->actions[1] * cos(env->yaw);
-  env->vel[2] = env->actions[3];
+  env->vel[2] = env->actions[2];
 
   add3(env->pos, env->vel, env->next_pos);
   clamp3(env->next_pos, -10, 10);
@@ -256,7 +256,6 @@ void c_step(Drone *env) {
     c_reset(env);
   }
 
-  env->rewards[0] -= 0.1;
   env->pos[0] = env->next_pos[0];
   env->pos[1] = env->next_pos[1];
   env->pos[2] = env->next_pos[2];
