@@ -44,7 +44,6 @@ class Drone(pufferlib.PufferEnv):
         return self.observations, []
 
     def step(self, actions):
-        print(actions)
         self.actions[:] = actions
         self.c_envs.step()
 
@@ -65,11 +64,11 @@ class Drone(pufferlib.PufferEnv):
 
 
 def test_performance(timeout=10, atn_cache=1024):
-    env = Drone(num_envs=2)
+    env = Drone(num_envs=1000)
     env.reset()
     tick = 0
 
-    actions = np.random.randint(0, 2, (atn_cache, env.num_agents))
+    actions = [env.action_space.sample() for _ in range(atn_cache)]
 
     import time
 
