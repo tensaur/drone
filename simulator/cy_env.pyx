@@ -41,7 +41,7 @@ cdef class CyDrone:
         LogBuffer* logs
         int num_envs
 
-    def __init__(self, float[:, :] observations, float[:] actions,
+    def __init__(self, float[:, :] observations, float[:, :] actions,
                  float[:] rewards, unsigned char[:] terminals, int num_envs):
         self.num_envs = num_envs;
         self.envs = <Drone*> calloc(num_envs, sizeof(Drone));
@@ -51,7 +51,7 @@ cdef class CyDrone:
         for i in range(num_envs):
             self.envs[i] = Drone(
                 observations = &observations[i, 0],
-                actions = &actions[i],
+                actions = &actions[i, 0],
                 rewards = &rewards[i],
                 terminals = &terminals[i],
                 log_buffer=self.logs,
