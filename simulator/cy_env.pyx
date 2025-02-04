@@ -27,9 +27,12 @@ cdef extern from "env.h":
         int n_targets;
         int moves_left;
         float pos[3];
+        float next_pos[3];
+        float vel[3];
         float yaw;
         float move_target[3];
         float look_target[3];
+        float vec_to_target[3];
 
     void init(Drone* env)
     void c_reset(Drone* env)

@@ -121,6 +121,13 @@ static inline void scalmul3(const float a[3], float s, float out[3]) {
   out[2] = a[2] * s;
 }
 
+// In-place clamp of a vector
+static inline void clamp3(float a[3], float min, float max) {
+  a[0] = clampf(a[0], min, max);
+  a[1] = clampf(a[1], min, max);
+  a[2] = clampf(a[2], min, max);
+}
+
 // ------------------------------------------------------------
 
 typedef struct Drone Drone;
@@ -136,9 +143,13 @@ struct Drone {
   int n_targets;
   int moves_left;
   float pos[3];
+  float next_pos[3];
+  float vel[3];
   float yaw;
   float move_target[3];
   float look_target[3];
+  float vec_to_target[3];
+
   /*float closest_dist;*/
   /*Vector near_collision;*/
   /*Vector rays[N_RAYS];*/
@@ -209,4 +220,50 @@ void c_reset(Drone *env) {
   compute_observations(env);
 }
 
-void c_step(Drone *env) { compute_observations(env); }
+void c_step(Drone *env) {
+  clamp3(env->actions, -1, 1);
+
+  env->tick += 1;
+  env->log.episode_length += 1;
+  env->rewards[0] = 0;
+  env->terminals[0] = 0;
+
+  env->vel[0] =
+      env->actions[0] * cos(env->yaw) - env->actions[1] * sin(env->yaw);
+  env->vel[1] =
+      env->actions[0] * sin(env->yaw) + env->actions[1] * cos(env->yaw);
+  env->vel[2] = env->actions[3];
+
+  add3(env->pos, env->vel, env->next_pos);
+  clamp3(env->next_pos, -10, 10);
+
+  sub3(env->next_pos, env->move_target, env->vec_to_target);
+  if (norm3(env->vec_to_target) < 1.5) {
+    env->rewards[0] += 1;
+    env->log.episode_return += 1;
+    env->log.score += 1;
+    env->n_targets -= 1;
+
+    env->move_target[0] = rndf(-10, 10);
+    env->move_target[1] = rndf(-10, 10);
+    env->move_target[2] = rndf(-10, 10);
+
+    if (env->n_targets == 0) {
+      env->terminals[0] = 1;
+    }
+  }
+
+  env->moves_left -= 1;
+  if (env->moves_left == 0) {
+    env->terminals[0] = 1;
+  }
+
+  env->rewards[0] -= 0.1;
+  env->pos[0] = env->next_pos[0];
+  env->pos[1] = env->next_pos[1];
+  env->pos[2] = env->next_pos[2];
+
+  env->yaw = rndf(0, 2 * M_PI);
+
+  compute_observations(env);
+}
