@@ -21,7 +21,7 @@ import signal  # Aggressively exit on ctrl+c
 
 signal.signal(signal.SIGINT, lambda sig, frame: os._exit(0))
 
-import clean_pufferl
+import simulator.clean_pufferl as clean_pufferl
 
 
 def make_policy(env, policy_cls, rnn_cls, args):
@@ -503,7 +503,7 @@ if __name__ == "__main__":
         "--env",
         "--environment",
         type=str,
-        default="puffer_squared",
+        default="drone",
         help="Name of specific environment to run",
     )
     parser.add_argument(
@@ -590,7 +590,8 @@ if __name__ == "__main__":
             prev[subkey] = value
 
     package = args["package"]
-    module_name = f"pufferlib.environments.{package}"
+    # module_name = f"pufferlib.environments.{package}"
+    module_name = f"{package}"
     if package == "ocean":
         module_name = "pufferlib.ocean"
 

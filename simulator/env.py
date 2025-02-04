@@ -1,7 +1,12 @@
 import numpy as np
 import gymnasium
 import pufferlib
-from cy_env import CyDrone
+from pufferlib.ocean import torch
+from simulator.cy_env import CyDrone
+
+
+def env_creator(env_name):
+    return Drone
 
 
 class Drone(pufferlib.PufferEnv):
