@@ -250,12 +250,14 @@ void c_step(Drone *env) {
 
     if (env->n_targets == 0) {
       env->terminals[0] = 1;
+      add_log(env->log_buffer, &env->log);
     }
   }
 
   env->moves_left -= 1;
   if (env->moves_left == 0) {
     env->terminals[0] = 1;
+    add_log(env->log_buffer, &env->log);
   }
 
   env->rewards[0] -= 0.1;
