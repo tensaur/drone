@@ -247,17 +247,13 @@ void c_step(Drone *env) {
     env->move_target[0] = rndf(-10, 10);
     env->move_target[1] = rndf(-10, 10);
     env->move_target[2] = rndf(-10, 10);
-
-    if (env->n_targets == 0) {
-      env->terminals[0] = 1;
-      add_log(env->log_buffer, &env->log);
-    }
   }
 
   env->moves_left -= 1;
-  if (env->moves_left == 0) {
+  if (env->moves_left == 0 || env->n_targets == 0) {
     env->terminals[0] = 1;
     add_log(env->log_buffer, &env->log);
+    c_reset(env);
   }
 
   env->rewards[0] -= 0.1;
