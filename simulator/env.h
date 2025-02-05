@@ -6,7 +6,7 @@
 #include <string.h>
 
 #define GRID_SIZE 10.0f
-#define COL_RAD 0.55f
+#define COL_RAD 0.25f
 #define N_COLS 8
 #define N_RAYS 6
 
@@ -254,8 +254,10 @@ void c_reset(Drone *env) {
   compute_observations(env);
 }
 
+void calc_to_nearest_collider(Drone *env);
+
 void c_step(Drone *env) {
-  clamp3(env->actions, -1, 1);
+  clamp3(env->actions, -0.1f, 0.1f);
 
   env->closest_collider_dist = MAXFLOAT;
   for (int r = 0; r < N_RAYS; r++) {
@@ -288,6 +290,35 @@ void c_step(Drone *env) {
     env->move_target[2] = rndf(-10, 10);
   }
 
+  calc_to_nearest_collider(env);
+
+  if (env->closest_collider_dist < COL_RAD) {
+    env->rewards[0] -= 0.25;
+    env->log.episode_return -= 0.25;
+  } else if (COL_RAD < env->closest_collider_dist &&
+             env->closest_collider_dist < COL_RAD + 0.2) {
+    env->rewards[0] -= 0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
+    env->log.episode_return -=
+        0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
+  }
+
+  env->moves_left -= 1;
+  if (env->moves_left == 0 || env->n_targets == 0) {
+    env->terminals[0] = 1;
+    add_log(env->log_buffer, &env->log);
+    c_reset(env);
+  }
+
+  env->pos[0] = env->next_pos[0];
+  env->pos[1] = env->next_pos[1];
+  env->pos[2] = env->next_pos[2];
+
+  env->yaw = rndf(0, 2 * M_PI);
+
+  compute_observations(env);
+}
+
+void calc_to_nearest_collider(Drone *env) {
   for (int i = 0; i < N_COLS; i++) {
     float plane_vecs[3][3];
     sub3(env->colliders[i][1], env->colliders[i][0], plane_vecs[0]);
@@ -405,29 +436,4 @@ void c_step(Drone *env) {
       }
     }
   }
-
-  if (env->closest_collider_dist < COL_RAD) {
-    env->rewards[0] -= 0.25;
-    env->log.episode_return -= 0.25;
-  } else if (COL_RAD < env->closest_collider_dist &&
-             env->closest_collider_dist < COL_RAD + 0.2) {
-    env->rewards[0] -= 0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
-    env->log.episode_return -=
-        0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
-  }
-
-  env->moves_left -= 1;
-  if (env->moves_left == 0 || env->n_targets == 0) {
-    env->terminals[0] = 1;
-    add_log(env->log_buffer, &env->log);
-    c_reset(env);
-  }
-
-  env->pos[0] = env->next_pos[0];
-  env->pos[1] = env->next_pos[1];
-  env->pos[2] = env->next_pos[2];
-
-  env->yaw = rndf(0, 2 * M_PI);
-
-  compute_observations(env);
 }
