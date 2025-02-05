@@ -168,6 +168,12 @@ void init(Drone *env) {
   env->tick = 0;
 
   // precompute
+  for (int i = 0; i < N_RAYS; i++) {
+    for (int j = 0; j < 3; j++) {
+      env->rays[i][j] = 0;
+    }
+  }
+
   for (int i = 0; i < N_RAYS / 2; i++) {
     env->rays[i][i] = -1;
     env->rays[N_RAYS - 1 - i][i] = 1;
@@ -251,6 +257,11 @@ void c_reset(Drone *env) {
 void c_step(Drone *env) {
   clamp3(env->actions, -1, 1);
 
+  env->closest_collider_dist = MAXFLOAT;
+  for (int r = 0; r < N_RAYS; r++) {
+    env->projections[r] = 0;
+  }
+
   env->tick += 1;
   env->log.episode_length += 1;
   env->rewards[0] = 0;
@@ -277,10 +288,6 @@ void c_step(Drone *env) {
     env->move_target[2] = rndf(-10, 10);
   }
 
-  env->projections[0] = 0;
-  env->projections[1] = 0;
-  env->projections[2] = 0;
-
   for (int i = 0; i < N_COLS; i++) {
     float plane_vecs[2][3];
     sub3(env->colliders[i][1], env->colliders[i][0], plane_vecs[0]);
@@ -288,7 +295,6 @@ void c_step(Drone *env) {
 
     float collider_norm[3];
     cross3(plane_vecs[0], plane_vecs[1], collider_norm);
-
     normalize3(collider_norm);
 
     float d = -dot3(env->colliders[i][0], collider_norm);
@@ -330,14 +336,12 @@ void c_step(Drone *env) {
       for (int cidx = 0; cidx < 4; cidx++) {
         float v[3];
         sub3(env->colliders[i][cidx], point_on_plane, v);
-
         dist_to_corners[cidx] = norm3(v);
       }
 
       float closest_corners[2][3];
       int min_idx = 0, min2_idx = 1;
 
-      // Ensure smallest is index of the smaller element between index 0 & 1
       if (dist_to_corners[1] < dist_to_corners[0]) {
         min_idx = 1;
         min2_idx = 0;
@@ -379,7 +383,6 @@ void c_step(Drone *env) {
 
       float vec_to_point[3];
       sub3(close_point, env->next_pos, vec_to_point);
-
       close_dist = norm3(vec_to_point);
 
       if (close_dist < env->closest_collider_dist) {
