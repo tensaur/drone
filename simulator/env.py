@@ -19,7 +19,7 @@ class Drone(pufferlib.PufferEnv):
         self.single_observation_space = gymnasium.spaces.Box(
             low=-1,
             high=1,
-            shape=(8,),
+            shape=(14,),
             dtype=np.float32,
         )
 

@@ -4,7 +4,10 @@ import os
 
 cdef extern from "env.h":
     int LOG_BUFFER_SIZE
-    int GRID_SIZE
+    float GRID_SIZE
+    float COL_RAD
+    int N_COLS
+    int N_RAYS
 
     ctypedef struct Log:
         float episode_return
@@ -33,6 +36,12 @@ cdef extern from "env.h":
         float move_target[3];
         float look_target[3];
         float vec_to_target[3];
+        float closest_collider_dist;
+        float near_collision[3];
+        # TODO: change to consts
+        float rays[6][3];
+        float projections[6];
+        float colliders[8][4][3];
 
     void init(Drone* env)
     void c_reset(Drone* env)

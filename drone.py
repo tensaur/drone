@@ -1,14 +1,14 @@
+# type: ignore
 import argparse
 
+import torch
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from simulator.env import DroneEnv
-
-import torch
+from simulator.vis_env import DroneEnv as Drone
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
@@ -177,10 +177,11 @@ if __name__ == "__main__":
     args = cmd.parse_args()
     print(args)
 
-    env = DroneEnv()
-    model = torch.load('puffer.pt')
+    env = Drone()
+    model = torch.load("t.pt")
 
-    obs, _ = env.reset(n_targets=args.n)
+    # obs, _ = env.reset(n_targets=args.n)
+    obs, _ = env.reset()
     positions = [np.array(env.pos)]
     move_targets = [np.array(env.move_target)]
     look_targets = [np.array(env.look_target)]

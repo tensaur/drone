@@ -1,3 +1,4 @@
+#include <float.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -5,6 +6,9 @@
 #include <string.h>
 
 #define GRID_SIZE 10.0f
+#define COL_RAD 0.55f
+#define N_COLS 8
+#define N_RAYS 6
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -150,11 +154,13 @@ struct Drone {
   float look_target[3];
   float vec_to_target[3];
 
-  /*float closest_dist;*/
-  /*Vector near_collision;*/
-  /*Vector rays[N_RAYS];*/
-  /*float projection_totals[N_RAYS];*/
-  /*Vector colliders[128][4];*/
+  float closest_collider_dist;
+  float near_collision[3];
+
+  float rays[N_RAYS][3];
+  float projections[N_RAYS];
+
+  float colliders[N_COLS][4][3];
 };
 
 void init(Drone *env) {
@@ -162,11 +168,27 @@ void init(Drone *env) {
   env->tick = 0;
 
   // precompute
+  for (int i = 0; i < N_RAYS / 2; i++) {
+    env->rays[i][i] = -1;
+    env->rays[N_RAYS - 1 - i][i] = 1;
+  }
+
+  float cols[N_COLS][4][3] = {
+      {{-10, -10, -10}, {10, -10, -10}, {10, -10, 10}, {-10, -10, 10}},
+      {{10, -10, -10}, {10, 10, -10}, {10, 10, 10}, {10, -10, 10}},
+      {{10, 10, -10}, {10, 10, 10}, {-10, 10, 10}, {-10, 10, -10}},
+      {{-10, 10, -10}, {-10, 10, 10}, {-10, -10, 10}, {-10, -10, -10}},
+      {{-10, -10, 10}, {10, -10, 10}, {10, 10, 10}, {-10, 10, 10}},
+      {{10, 10, 10}, {10, -10, -10}, {10, 10, -10}, {-10, 10, -10}},
+      {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}},
+      {{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};
+
+  memcpy(env->colliders, cols, sizeof(cols));
 }
 
 void allocate(Drone *env) {
   init(env);
-  env->observations = (float *)calloc(8, sizeof(float));
+  env->observations = (float *)calloc(8 + N_RAYS, sizeof(float));
   env->actions = (float *)calloc(3, sizeof(float));
   env->rewards = (float *)calloc(1, sizeof(float));
   env->terminals = (unsigned char *)calloc(1, sizeof(unsigned char));
@@ -196,6 +218,10 @@ void compute_observations(Drone *env) {
 
   env->observations[6] = sin(env->yaw);
   env->observations[7] = cos(env->yaw);
+
+  for (int i = 0; i < N_RAYS; i++) {
+    env->observations[8 + i] = env->projections[i];
+  }
 }
 
 void c_reset(Drone *env) {
@@ -216,6 +242,8 @@ void c_reset(Drone *env) {
   env->look_target[0] = rndf(-10, 10);
   env->look_target[1] = rndf(-10, 10);
   env->look_target[2] = rndf(-10, 10);
+
+  env->closest_collider_dist = MAXFLOAT;
 
   compute_observations(env);
 }
@@ -247,6 +275,141 @@ void c_step(Drone *env) {
     env->move_target[0] = rndf(-10, 10);
     env->move_target[1] = rndf(-10, 10);
     env->move_target[2] = rndf(-10, 10);
+  }
+
+  env->projections[0] = 0;
+  env->projections[1] = 0;
+  env->projections[2] = 0;
+
+  for (int i = 0; i < N_COLS; i++) {
+    float plane_vecs[2][3];
+    sub3(env->colliders[i][1], env->colliders[i][0], plane_vecs[0]);
+    sub3(env->colliders[i][3], env->colliders[i][0], plane_vecs[1]);
+
+    float collider_norm[3];
+    cross3(plane_vecs[0], plane_vecs[1], collider_norm);
+
+    normalize3(collider_norm);
+
+    float d = -dot3(env->colliders[i][0], collider_norm);
+    float dist_to_plane = fabsf(collider_norm[0] * env->next_pos[0] +
+                                collider_norm[1] * env->next_pos[1] +
+                                collider_norm[2] * env->next_pos[2] + d) /
+                          norm3(collider_norm);
+
+    float mu = -(d + dot3(collider_norm, env->next_pos)) /
+               dot3(collider_norm, collider_norm);
+
+    float point_on_plane[3];
+    point_on_plane[0] = env->next_pos[0] + mu * collider_norm[0];
+    point_on_plane[1] = env->next_pos[1] + mu * collider_norm[1];
+    point_on_plane[2] = env->next_pos[2] + mu * collider_norm[2];
+
+    float p[3];
+    sub3(env->next_pos, env->colliders[i][0], p);
+
+    float close_point[3];
+    float close_dist;
+
+    if ((0 < dot3(p, plane_vecs[0]) &&
+         dot3(p, plane_vecs[0]) < dot3(plane_vecs[0], plane_vecs[0])) &&
+        (0 < dot3(p, plane_vecs[1]) &&
+         dot3(p, plane_vecs[1]) < dot3(plane_vecs[1], plane_vecs[1]))) {
+      if (dist_to_plane < env->closest_collider_dist) {
+        env->closest_collider_dist = dist_to_plane;
+        close_dist = dist_to_plane;
+        env->near_collision[0] = point_on_plane[0];
+        env->near_collision[1] = point_on_plane[1];
+        env->near_collision[2] = point_on_plane[2];
+        close_point[0] = point_on_plane[0];
+        close_point[1] = point_on_plane[1];
+        close_point[2] = point_on_plane[2];
+      }
+    } else {
+      float dist_to_corners[4];
+      for (int cidx = 0; cidx < 4; cidx++) {
+        float v[3];
+        sub3(env->colliders[i][cidx], point_on_plane, v);
+
+        dist_to_corners[cidx] = norm3(v);
+      }
+
+      float closest_corners[2][3];
+      int min_idx = 0, min2_idx = 1;
+
+      // Ensure smallest is index of the smaller element between index 0 & 1
+      if (dist_to_corners[1] < dist_to_corners[0]) {
+        min_idx = 1;
+        min2_idx = 0;
+      }
+
+      for (int i = 2; i < 4; i++) {
+        if (dist_to_corners[i] < dist_to_corners[min_idx]) {
+          min2_idx = min_idx;
+          min_idx = i;
+        } else if (dist_to_corners[i] < dist_to_corners[min2_idx]) {
+          min2_idx = i;
+        }
+      }
+
+      closest_corners[0][0] = env->colliders[i][min_idx][0];
+      closest_corners[0][1] = env->colliders[i][min_idx][1];
+      closest_corners[0][2] = env->colliders[i][min_idx][2];
+
+      closest_corners[1][0] = env->colliders[i][min2_idx][0];
+      closest_corners[1][1] = env->colliders[i][min2_idx][1];
+      closest_corners[1][2] = env->colliders[i][min2_idx][2];
+
+      float closest_edge[3];
+      sub3(closest_corners[1], closest_corners[0], closest_edge);
+
+      float plane_to_corner[3];
+      sub3(closest_corners[0], point_on_plane, plane_to_corner);
+
+      float omega = (-dot3(closest_edge, plane_to_corner)) /
+                    dot3(closest_edge, closest_edge);
+
+      if (omega < 0 || omega > 1) {
+        omega = 0;
+      }
+
+      close_point[0] = closest_corners[0][0] + omega * closest_edge[0];
+      close_point[1] = closest_corners[0][1] + omega * closest_edge[1];
+      close_point[2] = closest_corners[0][2] + omega * closest_edge[2];
+
+      float vec_to_point[3];
+      sub3(close_point, env->next_pos, vec_to_point);
+
+      close_dist = norm3(vec_to_point);
+
+      if (close_dist < env->closest_collider_dist) {
+        env->closest_collider_dist = close_dist;
+        env->near_collision[0] = close_point[0];
+        env->near_collision[1] = close_point[1];
+        env->near_collision[2] = close_point[2];
+      }
+    }
+
+    for (int r = 0; r < N_RAYS; r++) {
+      float dir_unit[3];
+      sub3(close_point, env->next_pos, dir_unit);
+      normalize3(dir_unit);
+
+      float projection = clampf(dot3(env->rays[r], dir_unit), 0, 1);
+      if ((projection > env->projections[r]) && close_dist < 1) {
+        env->projections[r] = projection * (1 - close_dist);
+      }
+    }
+  }
+
+  if (env->closest_collider_dist < COL_RAD) {
+    env->rewards[0] -= 0.25;
+    env->log.episode_return -= 0.25;
+  } else if (COL_RAD < env->closest_collider_dist &&
+             env->closest_collider_dist < COL_RAD + 0.2) {
+    env->rewards[0] -= 0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
+    env->log.episode_return -=
+        0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
   }
 
   env->moves_left -= 1;
