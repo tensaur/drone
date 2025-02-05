@@ -347,7 +347,7 @@ void c_step(Drone *env) {
         min2_idx = 0;
       }
 
-      for (int k = 2; i < 4; i++) {
+      for (int k = 2; k < 4; k++) {
         if (dist_to_corners[k] < dist_to_corners[min_idx]) {
           min2_idx = min_idx;
           min_idx = k;

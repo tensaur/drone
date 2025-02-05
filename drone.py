@@ -191,6 +191,7 @@ if __name__ == "__main__":
     while True:
         obs = torch.tensor([obs], dtype=torch.float32)
         action, _, _, _ = model(obs)
+        action = np.clip(action, -1 ,1)
         obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
         move_targets.append(np.array(env.move_target))
