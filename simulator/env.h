@@ -185,7 +185,7 @@ void init(Drone *env) {
       {{10, 10, -10}, {10, 10, 10}, {-10, 10, 10}, {-10, 10, -10}},
       {{-10, 10, -10}, {-10, 10, 10}, {-10, -10, 10}, {-10, -10, -10}},
       {{-10, -10, 10}, {10, -10, 10}, {10, 10, 10}, {-10, 10, 10}},
-      {{10, 10, 10}, {10, -10, -10}, {10, 10, -10}, {-10, 10, -10}},
+      {{-10, -10, -10}, {10, -10, -10}, {10, 10, -10}, {-10, 10, -10}},
       {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}},
       {{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};
 
@@ -289,12 +289,13 @@ void c_step(Drone *env) {
   }
 
   for (int i = 0; i < N_COLS; i++) {
-    float plane_vecs[2][3];
+    float plane_vecs[3][3];
     sub3(env->colliders[i][1], env->colliders[i][0], plane_vecs[0]);
     sub3(env->colliders[i][3], env->colliders[i][0], plane_vecs[1]);
+    sub3(env->colliders[i][2], env->colliders[i][0], plane_vecs[2]);
 
     float collider_norm[3];
-    cross3(plane_vecs[0], plane_vecs[1], collider_norm);
+    cross3(plane_vecs[0], plane_vecs[2], collider_norm);
     normalize3(collider_norm);
 
     float d = -dot3(env->colliders[i][0], collider_norm);
