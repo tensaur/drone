@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from simulator.vis_env import DroneEnv as Drone
+from simulator.env import Drone
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     args = cmd.parse_args()
     print(args)
 
-    env = Drone()
+    env = Drone(num_envs=1)
     model = torch.load("t.pt")
 
     # obs, _ = env.reset(n_targets=args.n)

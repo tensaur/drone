@@ -7,3 +7,4 @@ build/
 *.so
 *.pth
 *.pt
+simulator/cy_env.c

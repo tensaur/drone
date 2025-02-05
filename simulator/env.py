@@ -1,3 +1,4 @@
+# type: ignore
 import numpy as np
 import gymnasium
 import pufferlib
@@ -9,7 +10,7 @@ except ModuleNotFoundError:
     from cy_env import CyDrone
 
 
-def env_creator(env_name):
+def env_creator(_):
     return Drone
 
 
@@ -50,11 +51,13 @@ class Drone(pufferlib.PufferEnv):
     def reset(self, seed=None):
         self.tick = 0
         self.c_envs.reset()
+        self.export_vars()
         return self.observations, []
 
     def step(self, actions):
         self.actions[:] = actions
         self.c_envs.step()
+        self.export_vars()
 
         info = []
         if self.tick % self.report_interval == 0:
@@ -70,6 +73,17 @@ class Drone(pufferlib.PufferEnv):
 
     def close(self):
         self.c_envs.close()
+
+    def export_vars(self):
+        # Make properties available which are needed for the visualisation
+        if self.num_agents == 1:
+            self.pos = self.c_envs.pos
+            self.move_target = self.c_envs.move_target
+            self.look_target = self.c_envs.look_target
+            self.yaw = self.c_envs.yaw
+            self.near_collision = self.c_envs.near_collision
+            self.colliders = self.c_envs.colliders
+            self.rays = self.c_envs.rays
 
 
 def test_performance(timeout=10, atn_cache=1024):
