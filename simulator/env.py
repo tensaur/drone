@@ -2,7 +2,11 @@ import numpy as np
 import gymnasium
 import pufferlib
 from pufferlib.ocean import torch
-from simulator.cy_env import CyDrone
+
+try:
+    from simulator.cy_env import CyDrone
+except ModuleNotFoundError:
+    from cy_env import CyDrone
 
 
 def env_creator(env_name):
