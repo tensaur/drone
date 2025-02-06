@@ -4,10 +4,16 @@ import gymnasium
 import pufferlib
 from pufferlib.ocean import torch
 
+
 try:
     from simulator.cy_env import CyDrone
+    from simulator.policy import DronePolicy
 except ModuleNotFoundError:
     from cy_env import CyDrone
+    from policy import DronePolicy
+
+
+torch.DronePolicy = DronePolicy
 
 
 def env_creator(_):

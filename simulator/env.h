@@ -4,10 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define GRID_SIZE 10.0f
 #define COL_RAD 0.25f
-#define N_COLS 8
+#define N_COLS 7
 #define N_RAYS 6
 
 // ------------------------------------------------------------
@@ -167,6 +168,8 @@ void init(Drone *env) {
   // logging
   env->tick = 0;
 
+  srand(time(NULL));
+
   // precompute
   for (int i = 0; i < N_RAYS; i++) {
     for (int j = 0; j < 3; j++) {
@@ -186,8 +189,8 @@ void init(Drone *env) {
       {{-10, 10, -10}, {-10, 10, 10}, {-10, -10, 10}, {-10, -10, -10}},
       {{-10, -10, 10}, {10, -10, 10}, {10, 10, 10}, {-10, 10, 10}},
       {{-10, -10, -10}, {10, -10, -10}, {10, 10, -10}, {-10, 10, -10}},
-      {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}},
-      {{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};
+      {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}}};
+  /*{{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};*/
 
   memcpy(env->colliders, cols, sizeof(cols));
 }
@@ -257,11 +260,26 @@ void c_reset(Drone *env) {
 void calc_to_nearest_collider(Drone *env);
 
 void c_step(Drone *env) {
-  clamp3(env->actions, -0.1f, 0.1f);
+  clamp3(env->actions, -1, 1);
+
+  for (int i = 0; i < N_RAYS / 2; i++) {
+    env->rays[i][i] = -1;
+    env->rays[N_RAYS - 1 - i][i] = 1;
+  }
 
   env->closest_collider_dist = MAXFLOAT;
   for (int r = 0; r < N_RAYS; r++) {
     env->projections[r] = 0;
+
+    float yaw_adjusted_ray[2];
+
+    yaw_adjusted_ray[0] =
+        env->rays[r][0] * cos(env->yaw) - env->rays[r][1] * sin(env->yaw);
+    yaw_adjusted_ray[1] =
+        env->rays[r][0] * sin(env->yaw) + env->rays[r][1] * cos(env->yaw);
+
+    env->rays[r][0] = yaw_adjusted_ray[0];
+    env->rays[r][1] = yaw_adjusted_ray[1];
   }
 
   env->tick += 1;
@@ -270,10 +288,10 @@ void c_step(Drone *env) {
   env->terminals[0] = 0;
 
   env->vel[0] =
-      env->actions[0] * cos(env->yaw) - env->actions[1] * sin(env->yaw);
+      (env->actions[0] * cos(env->yaw) - env->actions[1] * sin(env->yaw)) * 0.5;
   env->vel[1] =
-      env->actions[0] * sin(env->yaw) + env->actions[1] * cos(env->yaw);
-  env->vel[2] = env->actions[2];
+      (env->actions[0] * sin(env->yaw) + env->actions[1] * cos(env->yaw)) * 0.5;
+  env->vel[2] = env->actions[2] * 0.5;
 
   add3(env->pos, env->vel, env->next_pos);
   clamp3(env->next_pos, -10, 10);
@@ -293,14 +311,19 @@ void c_step(Drone *env) {
   calc_to_nearest_collider(env);
 
   if (env->closest_collider_dist < COL_RAD) {
-    env->rewards[0] -= 0.25;
-    env->log.episode_return -= 0.25;
-  } else if (COL_RAD < env->closest_collider_dist &&
-             env->closest_collider_dist < COL_RAD + 0.2) {
-    env->rewards[0] -= 0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
-    env->log.episode_return -=
-        0.1 + ((env->closest_collider_dist - COL_RAD) / 2);
+    env->rewards[0] -= 1;
+    env->log.episode_return -= 1;
+
+    env->terminals[0] = 1;
+    add_log(env->log_buffer, &env->log);
+    c_reset(env);
   }
+  /*else if (COL_RAD < env->closest_collider_dist &&*/
+  /*           env->closest_collider_dist < COL_RAD + 0.2) {*/
+  /*  env->rewards[0] -= 0.1 + ((env->closest_collider_dist - COL_RAD) / 2);*/
+  /*  env->log.episode_return -=*/
+  /*      0.1 + ((env->closest_collider_dist - COL_RAD) / 2);*/
+  /*}*/
 
   env->moves_left -= 1;
   if (env->moves_left == 0 || env->n_targets == 0) {
