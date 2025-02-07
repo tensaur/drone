@@ -125,7 +125,7 @@ class Visualiser3D:
             label="Closest Collision Point",
         )
 
-        for r in self.rays:
+        for r in self.rays[frame]:
             self.ax.quiver(
                 self.positions[frame, 0],
                 self.positions[frame, 1],
@@ -187,6 +187,7 @@ if __name__ == "__main__":
     look_targets = [np.array(env.look_target)]
     yaws = [np.array(env.yaw)]
     near_collisions = [np.array(env.near_collision)]
+    rays = [np.array(env.rays)]
 
     while True:
         obs = torch.tensor([obs], dtype=torch.float32)
@@ -197,6 +198,7 @@ if __name__ == "__main__":
         look_targets.append(np.array(env.look_target))
         yaws.append(np.array(env.yaw))
         near_collisions.append(np.array(env.near_collision))
+        rays.append(np.array(env.rays))
         if terminated or truncated:
             break
 
@@ -205,6 +207,7 @@ if __name__ == "__main__":
     look_targets = np.array(look_targets)
     yaws = np.array(yaws)
     near_collisions = np.array(near_collisions)
+    rays = np.array(rays)
 
     vis = Visualiser3D(
         positions,
@@ -213,5 +216,5 @@ if __name__ == "__main__":
         yaws,
         near_collisions,
         env.colliders,
-        env.rays,
+        rays,
     )

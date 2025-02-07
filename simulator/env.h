@@ -8,7 +8,7 @@
 
 #define GRID_SIZE 10.0f
 #define COL_RAD 0.25f
-#define N_COLS 7
+#define N_COLS 8
 #define N_RAYS 6
 
 // ------------------------------------------------------------
@@ -189,8 +189,8 @@ void init(Drone *env) {
       {{-10, 10, -10}, {-10, 10, 10}, {-10, -10, 10}, {-10, -10, -10}},
       {{-10, -10, 10}, {10, -10, 10}, {10, 10, 10}, {-10, 10, 10}},
       {{-10, -10, -10}, {10, -10, -10}, {10, 10, -10}, {-10, 10, -10}},
-      {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}}};
-  /*{{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};*/
+      {{0, 0, -5}, {0, 10, -5}, {0, 10, 10}, {0, 0, 10}},
+      {{0, 0, 5}, {0, -10, 5}, {0, -10, -10}, {0, 0, -10}}};
 
   memcpy(env->colliders, cols, sizeof(cols));
 }
@@ -262,6 +262,17 @@ void calc_to_nearest_collider(Drone *env);
 void c_step(Drone *env) {
   clamp3(env->actions, -1, 1);
 
+  env->tick += 1;
+  env->log.episode_length += 1;
+  env->rewards[0] = 0;
+  env->terminals[0] = 0;
+
+  for (int i = 0; i < N_RAYS; i++) {
+    env->rays[i][0] = 0;
+    env->rays[i][1] = 0;
+    env->rays[i][2] = 0;
+  }
+
   for (int i = 0; i < N_RAYS / 2; i++) {
     env->rays[i][i] = -1;
     env->rays[N_RAYS - 1 - i][i] = 1;
@@ -281,11 +292,6 @@ void c_step(Drone *env) {
     env->rays[r][0] = yaw_adjusted_ray[0];
     env->rays[r][1] = yaw_adjusted_ray[1];
   }
-
-  env->tick += 1;
-  env->log.episode_length += 1;
-  env->rewards[0] = 0;
-  env->terminals[0] = 0;
 
   env->vel[0] =
       (env->actions[0] * cos(env->yaw) - env->actions[1] * sin(env->yaw)) * 0.5;
@@ -336,7 +342,13 @@ void c_step(Drone *env) {
   env->pos[1] = env->next_pos[1];
   env->pos[2] = env->next_pos[2];
 
+  /*env->look_target[0] += rndf(-0.2f, 0.2f);*/
+  /*env->look_target[1] += rndf(-0.2f, 0.2f);*/
+  /*env->look_target[2] += rndf(-0.2f, 0.2f);*/
+
   env->yaw = rndf(0, 2 * M_PI);
+  /*env->yaw = atan2(env->pos[1] - env->look_target[1],*/
+  /*                 env->pos[0] - env->look_target[0]);*/
 
   compute_observations(env);
 }

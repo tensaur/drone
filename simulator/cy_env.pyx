@@ -43,7 +43,7 @@ cdef extern from "env.h":
         # TODO: change to consts
         float rays[6][3];
         float projections[6];
-        float colliders[7][4][3];
+        float colliders[8][4][3];
 
     void init(Drone* env)
     void c_reset(Drone* env)
