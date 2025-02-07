@@ -1,15 +1,14 @@
+# type: ignore
 import argparse
 
+import torch
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-from simulator.ppo import Agent
-from simulator.env import DroneEnv
-
-import torch
+from simulator.env import Drone
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
@@ -126,7 +125,7 @@ class Visualiser3D:
             label="Closest Collision Point",
         )
 
-        for r in self.rays:
+        for r in self.rays[frame]:
             self.ax.quiver(
                 self.positions[frame, 0],
                 self.positions[frame, 1],
@@ -178,27 +177,28 @@ if __name__ == "__main__":
     args = cmd.parse_args()
     print(args)
 
-    env = DroneEnv()
-    model = Agent(None)
-    model.load_state_dict(torch.load("ppo_9984000.pth"))
+    env = Drone(num_envs=1)
+    model = torch.load("drone-v1.pt")
 
-    obs, _ = env.reset(n_targets=args.n)
+    # obs, _ = env.reset(n_targets=args.n)
+    obs, _ = env.reset()
     positions = [np.array(env.pos)]
     move_targets = [np.array(env.move_target)]
     look_targets = [np.array(env.look_target)]
     yaws = [np.array(env.yaw)]
     near_collisions = [np.array(env.near_collision)]
+    rays = [np.array(env.rays)]
 
     while True:
-        action, _, _, _ = model.get_action_and_value(
-            torch.tensor([obs], dtype=torch.float32)
-        )
+        obs = torch.tensor([obs], dtype=torch.float32)
+        action, _, _, _ = model(obs)
         obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
         move_targets.append(np.array(env.move_target))
         look_targets.append(np.array(env.look_target))
         yaws.append(np.array(env.yaw))
         near_collisions.append(np.array(env.near_collision))
+        rays.append(np.array(env.rays))
         if terminated or truncated:
             break
 
@@ -207,6 +207,7 @@ if __name__ == "__main__":
     look_targets = np.array(look_targets)
     yaws = np.array(yaws)
     near_collisions = np.array(near_collisions)
+    rays = np.array(rays)
 
     vis = Visualiser3D(
         positions,
@@ -215,5 +216,5 @@ if __name__ == "__main__":
         yaws,
         near_collisions,
         env.colliders,
-        env.rays,
+        rays,
     )

@@ -1,5 +1,10 @@
 venv/
+.DS_Store
 **/__pycache__
 wandb/
 runs/
+build/
+*.so
 *.pth
+*.pt
+simulator/cy_env.c
