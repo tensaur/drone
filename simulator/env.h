@@ -236,7 +236,7 @@ void compute_observations(Drone *env) {
 void c_reset(Drone *env) {
   env->log = (Log){0};
 
-  env->n_targets = 5;
+  env->n_targets = 20;
   env->moves_left = 1500;
   env->yaw = 0;
 
@@ -248,9 +248,9 @@ void c_reset(Drone *env) {
   env->move_target[1] = rndf(-10, 10);
   env->move_target[2] = rndf(-10, 10);
 
-  env->look_target[0] = rndf(-10, 10);
-  env->look_target[1] = rndf(-10, 10);
-  env->look_target[2] = rndf(-10, 10);
+  env->look_target[0] = 0;
+  env->look_target[1] = 0;
+  env->look_target[2] = 0;
 
   env->closest_collider_dist = MAXFLOAT;
 
@@ -303,7 +303,7 @@ void c_step(Drone *env) {
   clamp3(env->next_pos, -10, 10);
 
   sub3(env->next_pos, env->move_target, env->vec_to_target);
-  if (norm3(env->vec_to_target) < 2.0) {
+  if (norm3(env->vec_to_target) < 3.0) {
     env->rewards[0] += 1;
     env->log.episode_return += 1;
     env->log.score += 1;
@@ -341,10 +341,6 @@ void c_step(Drone *env) {
   env->pos[0] = env->next_pos[0];
   env->pos[1] = env->next_pos[1];
   env->pos[2] = env->next_pos[2];
-
-  env->look_target[0] += rndf(-0.2f, 0.2f);
-  env->look_target[1] += rndf(-0.2f, 0.2f);
-  env->look_target[2] += rndf(-0.2f, 0.2f);
 
   /*env->yaw = rndf(0, 2 * M_PI);*/
   env->yaw = atan2(env->pos[1] - env->look_target[1],
