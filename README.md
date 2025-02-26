@@ -2,6 +2,8 @@
 
 `drone` is a reinforcement learning based drone controller and simulator tool for the [Warwick AI](https://warwick.ai) drone project.
 
+This project was presented at the 2025 Warwick Artificial Intelligence summit. The slides for this talk are available [here](./docs/summit.pdf).
+
 ## Installation
 
 Install the required packages - which are outlined in `pyproject.toml`. 
@@ -9,6 +11,7 @@ They can be installed with `pip` or a Python package management tool such as [`u
 
 ```bash
 git clone https://github.com/stmio/drone.git
+cd drone
 uv sync
 ```
 
