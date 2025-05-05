@@ -35,7 +35,7 @@ class Drone(pufferlib.PufferEnv):
         )
 
         self.single_action_space = gymnasium.spaces.Box(
-            low=-1, high=1, shape=(3,), dtype=np.float32
+            low=-1, high=1, shape=(4,), dtype=np.float32
         )
 
         self.num_agents = num_envs

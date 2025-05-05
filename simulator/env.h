@@ -8,8 +8,21 @@
 
 #define GRID_SIZE 10.0f
 #define COL_RAD 0.25f
-#define N_COLS 8
-#define N_RAYS 6
+
+// Collision-related constants
+#define N_COLS 0
+#define N_RAYS 0
+
+// Physical constants
+#define K 0.00000298f
+#define B 0.000000114f
+#define L 0.225f
+
+// Intertial constants
+#define IX 0.004856f
+#define IY 0.004856f
+#define IZ 0.008801f
+#define IR 0.00003357f
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -147,10 +160,14 @@ struct Drone {
 
   int n_targets;
   int moves_left;
-  float pos[3];
-  float next_pos[3];
-  float vel[3];
-  float yaw;
+
+  float pos[3];          // global position (X, Y, Z)
+  float next_pos[3];     // global position of next step
+  float vel[3];          // linear velocity (U, V, W)
+  float angles[3];       // roll (phi), pitch (theta), yaw (psi)
+  float angular_vel[3];  // angular velocities (P, Q, R)
+  float rotor_speeds[4]; // speed of quadcopter rotors (omega_i)
+
   float move_target[3];
   float look_target[3];
   float vec_to_target[3];
@@ -197,7 +214,7 @@ void init(Drone *env) {
 
 void allocate(Drone *env) {
   init(env);
-  env->observations = (float *)calloc(8 + N_RAYS, sizeof(float));
+  env->observations = (float *)calloc(18 + N_RAYS, sizeof(float));
   env->actions = (float *)calloc(3, sizeof(float));
   env->rewards = (float *)calloc(1, sizeof(float));
   env->terminals = (unsigned char *)calloc(1, sizeof(unsigned char));
@@ -225,12 +242,24 @@ void compute_observations(Drone *env) {
   env->observations[4] = scaled_pos[1];
   env->observations[5] = scaled_pos[2];
 
-  env->observations[6] = sin(env->yaw);
-  env->observations[7] = cos(env->yaw);
+  env->observations[6] = sin(env->angles[0]);
+  env->observations[7] = cos(env->angles[0]);
+  env->observations[8] = sin(env->angles[1]);
+  env->observations[9] = cos(env->angles[1]);
+  env->observations[10] = sin(env->angles[2]);
+  env->observations[11] = cos(env->angles[2]);
 
-  for (int i = 0; i < N_RAYS; i++) {
-    env->observations[8 + i] = env->projections[i];
-  }
+  env->observations[12] = env->vel[0];
+  env->observations[13] = env->vel[1];
+  env->observations[14] = env->vel[2];
+
+  env->observations[15] = env->angular_vel[0];
+  env->observations[16] = env->angular_vel[1];
+  env->observations[17] = env->angular_vel[2];
+
+  // for (int i = 0; i < N_RAYS; i++) {
+  //   env->observations[8 + i] = env->projections[i];
+  // }
 }
 
 void c_reset(Drone *env) {
@@ -238,7 +267,6 @@ void c_reset(Drone *env) {
 
   env->n_targets = 5;
   env->moves_left = 1500;
-  env->yaw = 0;
 
   env->pos[0] = rndf(-10, 10);
   env->pos[1] = rndf(-10, 10);
@@ -251,6 +279,18 @@ void c_reset(Drone *env) {
   env->look_target[0] = rndf(-10, 10);
   env->look_target[1] = rndf(-10, 10);
   env->look_target[2] = rndf(-10, 10);
+
+  env->angles[0] = 0;
+  env->angles[1] = 0;
+  env->angles[2] = 0;
+
+  env->vel[0] = 0;
+  env->vel[1] = 0;
+  env->vel[2] = 0;
+
+  env->angular_vel[0] = 0;
+  env->angular_vel[1] = 0;
+  env->angular_vel[2] = 0;
 
   env->closest_collider_dist = MAXFLOAT;
 
