@@ -19,6 +19,8 @@ class Visualiser3D:
         positions,
         move_targets,
         look_targets,
+        rolls,
+        pitches,
         yaws,
     ):
         self.fig = plt.figure("Drone Simulation Tool for Warwick AI")
@@ -27,6 +29,8 @@ class Visualiser3D:
         self.positions = positions
         self.move_targets = move_targets
         self.look_targets = look_targets
+        self.rolls = rolls
+        self.pitches = pitches
         self.yaws = yaws
 
         _ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
@@ -35,6 +39,7 @@ class Visualiser3D:
     def update(self, frame):
         self.ax.clear()
 
+        # set axes limits & labels
         self.ax.set_xlim([-10, 10])
         self.ax.set_ylim([-10, 10])
         self.ax.set_zlim([-10, 10])
@@ -42,60 +47,51 @@ class Visualiser3D:
         self.ax.set_ylabel("Y")
         self.ax.set_zlabel("Z")
 
+        # draw trajectory so far
         self.ax.plot(
             self.positions[:frame, 0],
             self.positions[:frame, 1],
             self.positions[:frame, 2],
-            "gray",
+            color="gray",
         )
 
-        self.ax.scatter(
-            self.positions[frame, 0],
-            self.positions[frame, 1],
-            self.positions[frame, 2],
-            color="blue",
-            s=50,
-            label="Drone Position",
-        )
+        # scatter current pos & targets
+        pos = self.positions[frame]
+        self.ax.scatter(*pos, color="blue", s=50, label="Drone Position")
+        self.ax.scatter(*self.move_targets[frame], color="red",   s=100, marker="X", label="Move Target")
+        self.ax.scatter(*self.look_targets[frame], color="green", s=100, marker="X", label="Look Target")
 
-        self.ax.scatter(
-            self.move_targets[frame, 0],
-            self.move_targets[frame, 1],
-            self.move_targets[frame, 2],
-            color="red",
-            s=100,
-            marker="X",
-            label="Move Target Position",
-        )
+        # extract Euler angles
+        φ = self.rolls[frame]
+        θ = self.pitches[frame]
+        ψ = self.yaws[frame]
 
-        self.ax.scatter(
-            self.look_targets[frame, 0],
-            self.look_targets[frame, 1],
-            self.look_targets[frame, 2],
-            color="green",
-            s=100,
-            marker="X",
-            label="Look Target Position",
-        )
+        cφ, sφ = np.cos(φ), np.sin(φ)
+        cθ, sθ = np.cos(θ), np.sin(θ)
+        cψ, sψ = np.cos(ψ), np.sin(ψ)
 
-        yaw_angle = self.yaws[frame]
-        dx = np.cos(yaw_angle)
-        dy = np.sin(yaw_angle)
-        dz = 0
+        # body→world rotation matrix
+        R = np.array([
+            [ cθ*cψ,             sφ*sθ*cψ - cφ*sψ,   cφ*sθ*cψ + sφ*sψ ],
+            [ cθ*sψ,             sφ*sθ*sψ + cφ*cψ,   cφ*sθ*sψ - sφ*cψ ],
+            [ -sθ,               sφ*cθ,               cφ*cθ           ]
+        ])
 
-        self.ax.quiver(
-            self.positions[frame, 0],
-            self.positions[frame, 1],
-            self.positions[frame, 2],
-            -dx * 3,
-            -dy * 3,
-            -dz * 3,
-            length=1.0,
-            color="green",
-            arrow_length_ratio=0.2,
-        )
+        # body axes in world frame
+        x_body = R @ np.array([1.0, 0.0, 0.0])
+        y_body = R @ np.array([0.0, 1.0, 0.0])
+        z_body = R @ np.array([0.0, 0.0, 1.0])
+
+        length = 3.0  # scale arrows
+        origin = pos
+
+        # draw orthonormal axes
+        self.ax.quiver(*origin, *(-x_body * length), color="blue",  arrow_length_ratio=0.2, normalize=False)
+        self.ax.quiver(*origin, *(-y_body * length), color="red",   arrow_length_ratio=0.2, normalize=False)
+        self.ax.quiver(*origin, *(-z_body * length), color="green", arrow_length_ratio=0.2, normalize=False)
 
         self.ax.legend(prop={"size": 7}, markerscale=0.6)
+
 
 
 """ 
@@ -134,16 +130,22 @@ if __name__ == "__main__":
     positions = [np.array(env.pos)]
     move_targets = [np.array(env.move_target)]
     look_targets = [np.array(env.look_target)]
+    rolls = [np.array(env.roll)]
+    pitches = [np.array(env.pitch)]
     yaws = [np.array(env.yaw)]
 
     while True:
         obs = torch.tensor([obs], dtype=torch.float32)
-        action, _, _, _ = model(obs)
-        action = np.array([1000000,1000000,0,0])
+        print("obs:")
+        print(obs)
+        #action, _, _, _ = model(obs)
+        action = np.array([0.99,1,1,1]) * 1000
         obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
         move_targets.append(np.array(env.move_target))
         look_targets.append(np.array(env.look_target))
+        rolls.append(np.array(env.roll))
+        pitches.append(np.array(env.pitch))
         yaws.append(np.array(env.yaw))
         if terminated or truncated:
             break
@@ -155,11 +157,15 @@ if __name__ == "__main__":
     print(positions)
     move_targets = np.array(move_targets)
     look_targets = np.array(look_targets)
+    rolls = np.array(rolls)
+    pitches = np.array(pitches)
     yaws = np.array(yaws)
 
     vis = Visualiser3D(
         positions,
         move_targets,
         look_targets,
+        rolls,
+        pitches,
         yaws,
     )

@@ -86,6 +86,8 @@ class Drone(pufferlib.PufferEnv):
             self.pos = self.c_envs.pos
             self.move_target = self.c_envs.move_target
             self.look_target = self.c_envs.look_target
+            self.roll = self.c_envs.roll
+            self.pitch = self.c_envs.pitch
             self.yaw = self.c_envs.yaw
 
 def test_performance(timeout=10, atn_cache=1024):

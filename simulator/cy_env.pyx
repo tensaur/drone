@@ -105,5 +105,13 @@ cdef class CyDrone:
             return self.envs[0].look_target;
 
         @property
+        def roll(self):
+            return self.envs[0].angles[0];
+
+        @property
+        def pitch(self):
+            return self.envs[0].angles[1];
+
+        @property
         def yaw(self):
             return self.envs[0].angles[2];

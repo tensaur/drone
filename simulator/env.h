@@ -9,7 +9,7 @@
 #define GRID_SIZE 10.0f
 
 // Physical constants
-#define K 0.00000298f
+#define K 0.000000298f
 #define B 0.000000114f
 #define LEN 0.225f
 #define A 0.1f
@@ -18,10 +18,10 @@
 #define dt 0.01f
 
 // Intertial constants
-#define IX 0.004856f
-#define IY 0.004856f
-#define IZ 0.008801f
-#define IR 0.00003357f
+#define IX 0.1f
+#define IY 0.1f
+#define IZ 0.1f
+#define IR 0.1f
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -286,18 +286,51 @@ void c_step(Drone *env) {
   float Q_new = env->angular_vel[1] + Q_dot * dt;
   float R_new = env->angular_vel[2] + R_dot * dt;
 
-  float X_dot = env->vel[0];
-  float Y_dot = env->vel[1];
-  float Z_dot = env->vel[2];
-
   float phi_dot = env->angular_vel[0] + sin(env->angles[0])*tan(env->angles[1])*env->angular_vel[1] + cos(env->angles[0])*tan(env->angles[1])*env->angular_vel[2];
   float theta_dot = cos(env->angles[0])*env->angular_vel[1] - sin(env->angles[0])*env->angular_vel[2]; 
   float psi_dot = (sin(env->angles[0])/cos(env->angles[1]))*env->angular_vel[1] + (cos(env->angles[0])/cos(env->angles[1]))*env->angular_vel[2];
 
+  // 1) grab your updated body-frame velocities
+  float U = U_new, V = V_new, W = W_new;
 
-  float X_new = env->pos[0] + X_dot * dt;
-  float Y_new = env->pos[1] + Y_dot * dt;
-  float Z_new = env->pos[2] + Z_dot * dt;
+  // 2) unpack current Euler angles
+  float phi   = env->angles[0];
+  float theta = env->angles[1];
+  float psi   = env->angles[2];
+
+  float cphi = cosf(phi),  sphi = sinf(phi);
+  float cth  = cosf(theta),sth  = sinf(theta);
+  float cps  = cosf(psi),  sps  = sinf(psi);
+
+  // 3) build body→world rotation matrix Rbw
+  float Rbw[3][3] = {
+    { cth*cps,                   sphi*sth*cps - cphi*sps,   cphi*sth*cps + sphi*sps },
+    { cth*sps,                   sphi*sth*sps + cphi*cps,   cphi*sth*sps - sphi*cps },
+    { -sth,                      sphi*cth,                  cphi*cth                }
+  };
+
+  // 4) rotate into world frame
+  float world_vel[3];
+  world_vel[0] = Rbw[0][0]*U + Rbw[0][1]*V + Rbw[0][2]*W;
+  world_vel[1] = Rbw[1][0]*U + Rbw[1][1]*V + Rbw[1][2]*W;
+  world_vel[2] = Rbw[2][0]*U + Rbw[2][1]*V + Rbw[2][2]*W;
+
+  // 5) integrate position in world coords
+  float X_new = env->pos[0] + world_vel[0] * dt;
+  float Y_new = env->pos[1] + world_vel[1] * dt;
+  float Z_new = env->pos[2] + world_vel[2] * dt;
+
+  // clamp & store
+  env->next_pos[0] = X_new;
+  env->next_pos[1] = Y_new;
+  env->next_pos[2] = Z_new;
+
+  clamp3(env->next_pos, -10, 10);
+
+  env->pos[0] = env->next_pos[0];
+  env->pos[1] = env->next_pos[1];
+  env->pos[2] = env->next_pos[2];
+
 
   float phi_new = env->angles[0] + phi_dot * dt;
   float theta_new = env->angles[1] + theta_dot * dt;
