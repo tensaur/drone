@@ -29,21 +29,19 @@ cdef extern from "env.h":
         LogBuffer* log_buffer;
         Log log;
         int tick;
+
         int n_targets;
         int moves_left;
+
         float pos[3];
         float next_pos[3];
         float vel[3];
-        float yaw;
+        float angles[3];
+        float angular_vel[3];
+
         float move_target[3];
         float look_target[3];
         float vec_to_target[3];
-        float closest_collider_dist;
-        float near_collision[3];
-        # TODO: change to consts
-        float rays[6][3];
-        float projections[6];
-        float colliders[8][4][3];
 
     void init(Drone* env)
     void c_reset(Drone* env)
@@ -108,16 +106,4 @@ cdef class CyDrone:
 
         @property
         def yaw(self):
-            return self.envs[0].yaw;
-
-        @property
-        def near_collision(self):
-            return self.envs[0].near_collision;
-
-        @property
-        def colliders(self):
-            return self.envs[0].colliders;
-
-        @property
-        def rays(self):
-            return self.envs[0].rays;
+            return self.envs[0].angles[2];

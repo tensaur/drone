@@ -30,7 +30,7 @@ class Drone(pufferlib.PufferEnv):
         self.single_observation_space = gymnasium.spaces.Box(
             low=-1,
             high=1,
-            shape=(14,),
+            shape=(17,),
             dtype=np.float32,
         )
 
@@ -87,10 +87,6 @@ class Drone(pufferlib.PufferEnv):
             self.move_target = self.c_envs.move_target
             self.look_target = self.c_envs.look_target
             self.yaw = self.c_envs.yaw
-            self.near_collision = self.c_envs.near_collision
-            self.colliders = self.c_envs.colliders
-            self.rays = self.c_envs.rays
-
 
 def test_performance(timeout=10, atn_cache=1024):
     env = Drone(num_envs=1000)

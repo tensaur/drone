@@ -11,7 +11,11 @@
 // Physical constants
 #define K 0.00000298f
 #define B 0.000000114f
-#define L 0.225f
+#define LEN 0.225f
+#define A 0.1f
+#define mass 0.08f
+#define g 9.81f
+#define dt 0.01f
 
 // Intertial constants
 #define IX 0.004856f
@@ -161,7 +165,6 @@ struct Drone {
   float vel[3];          // linear velocity (U, V, W)
   float angles[3];       // roll (phi), pitch (theta), yaw (psi)
   float angular_vel[3];  // angular velocities (P, Q, R)
-  float rotor_speeds[4]; // speed of quadcopter rotors (omega_i)
 
   float move_target[3];
   float look_target[3];
@@ -177,7 +180,7 @@ void init(Drone *env) {
 void allocate(Drone *env) {
   init(env);
   env->observations = (float *)calloc(18, sizeof(float));
-  env->actions = (float *)calloc(3, sizeof(float));
+  env->actions = (float *)calloc(4, sizeof(float));
   env->rewards = (float *)calloc(1, sizeof(float));
   env->terminals = (unsigned char *)calloc(1, sizeof(unsigned char));
   env->log_buffer = allocate_logbuffer(LOG_BUFFER_SIZE);
@@ -253,19 +256,79 @@ void c_reset(Drone *env) {
   compute_observations(env);
 }
 
-void calc_to_nearest_collider(Drone *env);
-
 void c_step(Drone *env) {
-  clamp3(env->actions, -1, 1);
+  //clamp3(env->actions, -1, 1);
 
   env->tick += 1;
   env->log.episode_length += 1;
   env->rewards[0] = 0;
   env->terminals[0] = 0;
 
+  float T = K * (env->actions[0] + env->actions[1] + env->actions[2] + env->actions[3]);
+  float M_phi = LEN * K * (env->actions[3]*env->actions[3] - env->actions[1]*env->actions[1]);
+  float M_theta = LEN * K * (env->actions[2]*env->actions[2] - env->actions[0]*env->actions[0]);
+  float M_psi = B * (-env->actions[0] + env->actions[1] - env->actions[2] + env->actions[3]);
+
+  float U_dot = (sin(env->angles[0])*sin(env->angles[2]) + cos(env->angles[0])*sin(env->angles[1])*cos(env->angles[2])) * T/mass - A/mass * env->vel[0];
+  float V_dot = (-sin(env->angles[0])*cos(env->angles[2]) + cos(env->angles[0])*sin(env->angles[1])*sin(env->angles[2])) * T/mass - A/mass * env->vel[1];
+  float W_dot = -g + (cos(env->angles[0])*cos(env->angles[1])) * T/mass - (A/mass) * env->vel[2];
+
+  float Omega = -env->actions[0] + env->actions[1] - env->actions[2] + env->actions[3];
+  float P_dot = ((IY-IZ)/IX) * env->angular_vel[1]*env->angular_vel[2] - (IR/IX)*env->angular_vel[1]*Omega + M_phi/IX - (A/IX)*env->angular_vel[0];
+  float Q_dot = ((IZ-IX)/IY) * env->angular_vel[0]*env->angular_vel[2] - (IR/IY)*env->angular_vel[0]*Omega + M_theta/IY - (A/IY)*env->angular_vel[1];
+  float R_dot = ((IX-IY)/IZ) * env->angular_vel[0]*env->angular_vel[1] + M_psi/IZ - (A/IZ)*env->angular_vel[2];
+
+  float U_new = env->vel[0] + U_dot * dt;
+  float V_new = env->vel[1] + V_dot * dt;
+  float W_new = env->vel[2] + W_dot * dt;
+
+  float P_new = env->angular_vel[0] + P_dot * dt;
+  float Q_new = env->angular_vel[1] + Q_dot * dt;
+  float R_new = env->angular_vel[2] + R_dot * dt;
+
+  float X_dot = env->vel[0];
+  float Y_dot = env->vel[1];
+  float Z_dot = env->vel[2];
+
+  float phi_dot = env->angular_vel[0] + sin(env->angles[0])*tan(env->angles[1])*env->angular_vel[1] + cos(env->angles[0])*tan(env->angles[1])*env->angular_vel[2];
+  float theta_dot = cos(env->angles[0])*env->angular_vel[1] - sin(env->angles[0])*env->angular_vel[2]; 
+  float psi_dot = (sin(env->angles[0])/cos(env->angles[1]))*env->angular_vel[1] + (cos(env->angles[0])/cos(env->angles[1]))*env->angular_vel[2];
+
+
+  float X_new = env->pos[0] + X_dot * dt;
+  float Y_new = env->pos[1] + Y_dot * dt;
+  float Z_new = env->pos[2] + Z_dot * dt;
+
+  float phi_new = env->angles[0] + phi_dot * dt;
+  float theta_new = env->angles[1] + theta_dot * dt;
+  float psi_new = env->angles[2] + psi_dot * dt;
+
+  // updates old variables
+  env->next_pos[0] = X_new;
+  env->next_pos[1] = Y_new;
+  env->next_pos[2] = Z_new;  
   clamp3(env->next_pos, -10, 10);
 
+  // keeping this for reward calcs later
+  env->pos[0] = env->next_pos[0];
+  env->pos[1] = env->next_pos[1];
+  env->pos[2] = env->next_pos[2];
+
+  env->vel[0] = U_new;
+  env->vel[1] = V_new;
+  env->vel[2] = W_new;
+
+  env->angles[0] = phi_new;
+  env->angles[1] = theta_new;
+  env->angles[2] = psi_new;
+
+  env->angular_vel[0] = P_new;
+  env->angular_vel[1] = Q_new;
+  env->angular_vel[2] = R_new;
+
+
   sub3(env->next_pos, env->move_target, env->vec_to_target);
+
   if (norm3(env->vec_to_target) < 1.5) {
     env->rewards[0] += 1;
     env->log.episode_return += 1;
