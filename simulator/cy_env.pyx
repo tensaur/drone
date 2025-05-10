@@ -1,6 +1,7 @@
 cimport numpy as cnp
 from libc.stdlib cimport calloc, free
 import os
+import math
 
 NUM_ENVS = 0
 
@@ -34,10 +35,9 @@ cdef extern from "env.h":
         int moves_left;
 
         float pos[3];
-        float next_pos[3];
         float vel[3];
-        float angles[3];
-        float angular_vel[3];
+        float quat[4];
+        float omega[3];
 
         float move_target[3];
         float look_target[3];
@@ -106,12 +106,31 @@ cdef class CyDrone:
 
         @property
         def roll(self):
-            return self.envs[0].angles[0];
+            cdef float q0 = self.envs[0].quat[0]
+            cdef float q1 = self.envs[0].quat[1]
+            cdef float q2 = self.envs[0].quat[2]
+            cdef float q3 = self.envs[0].quat[3]
+            return math.atan2(2.0*(q0*q1 + q2*q3),
+                              1.0 - 2.0*(q1*q1 + q2*q2))
 
         @property
         def pitch(self):
-            return self.envs[0].angles[1];
+            cdef float q0 = self.envs[0].quat[0]
+            cdef float q1 = self.envs[0].quat[1]
+            cdef float q2 = self.envs[0].quat[2]
+            cdef float q3 = self.envs[0].quat[3]
+            cdef float t = 2.0*(q0*q2 - q3*q1)
+            if t >  1.0:
+                t =  1.0
+            elif t < -1.0:
+                t = -1.0
+            return math.asin(t)
 
         @property
         def yaw(self):
-            return self.envs[0].angles[2];
+            cdef float q0 = self.envs[0].quat[0]
+            cdef float q1 = self.envs[0].quat[1]
+            cdef float q2 = self.envs[0].quat[2]
+            cdef float q3 = self.envs[0].quat[3]
+            return math.atan2(2.0*(q0*q3 + q1*q2),
+                              1.0 - 2.0*(q2*q2 + q3*q3))

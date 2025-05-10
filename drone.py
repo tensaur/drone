@@ -33,7 +33,7 @@ class Visualiser3D:
         self.pitches = pitches
         self.yaws = yaws
 
-        _ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=10)
+        _ani = FuncAnimation(self.fig, self.update, frames=len(positions), interval=1)
         plt.show()
 
     def update(self, frame):
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     print(args)
 
     env = Drone(num_envs=1)
-    model = torch.load("experiments/drone-e91e02cc/model_000850.pt")
+    model = torch.load("experiments/drone-97f6570d/model_001150.pt")
 
     # obs, _ = env.reset(n_targets=args.n)
     obs, _ = env.reset()
@@ -138,8 +138,7 @@ if __name__ == "__main__":
         obs = torch.tensor([obs], dtype=torch.float32)
         print("obs:")
         print(obs)
-        #action, _, _, _ = model(obs)
-        action = np.array([0.99,1,1,1]) * 1000
+        action, _, _, _ = model(obs)
         obs, reward, terminated, truncated, info = env.step(np.array(action).flatten())
         positions.append(np.array(env.pos))
         move_targets.append(np.array(env.move_target))

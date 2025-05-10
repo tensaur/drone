@@ -7,21 +7,19 @@
 #include <time.h>
 
 #define GRID_SIZE 10.0f
+#define DT 0.01
 
-// Physical constants
-#define K 0.000000298f
-#define B 0.000000114f
-#define LEN 0.225f
-#define A 0.1f
-#define mass 0.08f
-#define g 9.81f
-#define dt 0.01f
+#define MASS      1.0f     // kg
+#define IXX       0.005f   // kgm^2
+#define IYY       0.005f   // kgm^2
+#define IZZ       0.009f   // kgm^2
+#define ARM_LEN   0.225f   // m
+#define K_THRUST  3e-5f    // thrust coefficient
+#define K_DRAG    1e-7f    // drag (torque) coefficient
+#define GRAVITY   9.81f     // m/s^2
+#define MAX_RPM   1000.0f  // rad/s
+#define K_ANG_DAMP 0.05f    // tune this
 
-// Intertial constants
-#define IX 0.1f
-#define IY 0.1f
-#define IZ 0.1f
-#define IR 0.1f
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -145,6 +143,38 @@ static inline void clamp3(float a[3], float min, float max) {
   a[2] = clampf(a[2], min, max);
 }
 
+// In-place clamp of a vector
+static inline void clamp4(float a[4], float min, float max) {
+  a[0] = clampf(a[0], min, max);
+  a[1] = clampf(a[1], min, max);
+  a[2] = clampf(a[2], min, max);
+  a[3] = clampf(a[3], min, max);
+}
+
+static inline void quat_mul(const float q1[4], const float q2[4], float out[4]) {
+    out[0] = q1[0]*q2[0] - q1[1]*q2[1] - q1[2]*q2[2] - q1[3]*q2[3];
+    out[1] = q1[0]*q2[1] + q1[1]*q2[0] + q1[2]*q2[3] - q1[3]*q2[2];
+    out[2] = q1[0]*q2[2] - q1[1]*q2[3] + q1[2]*q2[0] + q1[3]*q2[1];
+    out[3] = q1[0]*q2[3] + q1[1]*q2[2] - q1[2]*q2[1] + q1[3]*q2[0];
+}
+
+static inline void quat_normalize(float q[4]) {
+    float n = sqrtf(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+    if (n > 0.0f) {
+        q[0] /= n; q[1] /= n; q[2] /= n; q[3] /= n;
+    }
+}
+
+// Rotate vector v by quaternion q: out = q * [0,v] * q_conj
+static inline void quat_rotate(const float q[4], const float v[3], float out[3]) {
+    float qv[4] = {0.0f, v[0], v[1], v[2]};
+    float tmp[4], res[4];
+    quat_mul(q, qv, tmp);
+    float q_conj[4] = { q[0], -q[1], -q[2], -q[3] };
+    quat_mul(tmp, q_conj, res);
+    out[0] = res[1]; out[1] = res[2]; out[2] = res[3];
+}
+
 // ------------------------------------------------------------
 
 typedef struct Drone Drone;
@@ -161,10 +191,9 @@ struct Drone {
   int moves_left;
 
   float pos[3];          // global position (X, Y, Z)
-  float next_pos[3];     // global position of next step
   float vel[3];          // linear velocity (U, V, W)
-  float angles[3];       // roll (phi), pitch (theta), yaw (psi)
-  float angular_vel[3];  // angular velocities (P, Q, R)
+  float quat[4];       // roll (phi), pitch (theta), yaw (psi)
+  float omega[3];      // angular velocities (P, Q, R)
 
   float move_target[3];
   float look_target[3];
@@ -179,7 +208,7 @@ void init(Drone *env) {
 
 void allocate(Drone *env) {
   init(env);
-  env->observations = (float *)calloc(18, sizeof(float));
+  env->observations = (float *)calloc(16, sizeof(float));
   env->actions = (float *)calloc(4, sizeof(float));
   env->rewards = (float *)calloc(1, sizeof(float));
   env->terminals = (unsigned char *)calloc(1, sizeof(unsigned char));
@@ -207,31 +236,26 @@ void compute_observations(Drone *env) {
   env->observations[4] = scaled_pos[1];
   env->observations[5] = scaled_pos[2];
 
-  env->observations[6] = sin(env->angles[0]);
-  env->observations[7] = cos(env->angles[0]);
-  env->observations[8] = sin(env->angles[1]);
-  env->observations[9] = cos(env->angles[1]);
-  env->observations[10] = sin(env->angles[2]);
-  env->observations[11] = cos(env->angles[2]);
+  env->observations[6] = env->quat[0];
+  env->observations[7] = env->quat[1];
+  env->observations[8] = env->quat[2];
+  env->observations[9] = env->quat[3];
 
-  env->observations[12] = env->vel[0];
-  env->observations[13] = env->vel[1];
-  env->observations[14] = env->vel[2];
+  env->observations[10] = env->vel[0];
+  env->observations[11] = env->vel[1];
+  env->observations[12] = env->vel[2];
 
-  env->observations[15] = env->angular_vel[0];
-  env->observations[16] = env->angular_vel[1];
-  env->observations[17] = env->angular_vel[2];
+  env->observations[13] = env->omega[0];
+  env->observations[14] = env->omega[1];
+  env->observations[15] = env->omega[2];
 }
 
 void c_reset(Drone *env) {
   env->log = (Log){0};
 
-  env->n_targets = 5;
-  env->moves_left = 1500;
-
-  env->pos[0] = rndf(-10, 10);
-  env->pos[1] = rndf(-10, 10);
-  env->pos[2] = rndf(-10, 10);
+  // env
+  env->n_targets = 1;
+  env->moves_left = 1000;
 
   env->move_target[0] = rndf(-10, 10);
   env->move_target[1] = rndf(-10, 10);
@@ -241,126 +265,100 @@ void c_reset(Drone *env) {
   env->look_target[1] = rndf(-10, 10);
   env->look_target[2] = rndf(-10, 10);
 
-  env->angles[0] = 0;
-  env->angles[1] = 0;
-  env->angles[2] = 0;
+  // state
+  env->pos[0] = rndf(-10, 10);
+  env->pos[1] = rndf(-10, 10);
+  env->pos[2] = rndf(-10, 10);
 
-  env->vel[0] = 0;
-  env->vel[1] = 0;
-  env->vel[2] = 0;
+  env->vel[0] = 0.0f;
+  env->vel[1] = 0.0f;
+  env->vel[2] = 0.0f;
+  
+  env->quat[0] = 1.0f;
+  env->quat[1] = 0.0f;
+  env->quat[2] = 0.0f;
+  env->quat[3] = 0.0f;
 
-  env->angular_vel[0] = 0;
-  env->angular_vel[1] = 0;
-  env->angular_vel[2] = 0;
+  env->omega[0] = 0.0f;
+  env->omega[1] = 0.0f;
+  env->omega[2] = 0.0f;
 
   compute_observations(env);
 }
 
 void c_step(Drone *env) {
-  //clamp3(env->actions, -1, 1);
+  clamp4(env->actions, -1.0f, 1.0f);
 
   env->tick += 1;
   env->log.episode_length += 1;
   env->rewards[0] = 0;
   env->terminals[0] = 0;
 
-  float T = K * (env->actions[0] + env->actions[1] + env->actions[2] + env->actions[3]);
-  float M_phi = LEN * K * (env->actions[3]*env->actions[3] - env->actions[1]*env->actions[1]);
-  float M_theta = LEN * K * (env->actions[2]*env->actions[2] - env->actions[0]*env->actions[0]);
-  float M_psi = B * (-env->actions[0] + env->actions[1] - env->actions[2] + env->actions[3]);
+  float T[4];
+  for (int i = 0; i < 4; i++) {
+    float rpm = (env->actions[i] + 1.0f)*0.5f * MAX_RPM;
+    T[i] = K_THRUST * rpm * rpm;
+  }
 
-  float U_dot = (sin(env->angles[0])*sin(env->angles[2]) + cos(env->angles[0])*sin(env->angles[1])*cos(env->angles[2])) * T/mass - A/mass * env->vel[0];
-  float V_dot = (-sin(env->angles[0])*cos(env->angles[2]) + cos(env->angles[0])*sin(env->angles[1])*sin(env->angles[2])) * T/mass - A/mass * env->vel[1];
-  float W_dot = -g + (cos(env->angles[0])*cos(env->angles[1])) * T/mass - (A/mass) * env->vel[2];
+  float F_body[3] = {0.0f, 0.0f, T[0]+T[1]+T[2]+T[3]};
 
-  float Omega = -env->actions[0] + env->actions[1] - env->actions[2] + env->actions[3];
-  float P_dot = ((IY-IZ)/IX) * env->angular_vel[1]*env->angular_vel[2] - (IR/IX)*env->angular_vel[1]*Omega + M_phi/IX - (A/IX)*env->angular_vel[0];
-  float Q_dot = ((IZ-IX)/IY) * env->angular_vel[0]*env->angular_vel[2] - (IR/IY)*env->angular_vel[0]*Omega + M_theta/IY - (A/IY)*env->angular_vel[1];
-  float R_dot = ((IX-IY)/IZ) * env->angular_vel[0]*env->angular_vel[1] + M_psi/IZ - (A/IZ)*env->angular_vel[2];
+  float M[3] = {
+        ARM_LEN*(T[1]-T[3]),
+        ARM_LEN*(T[2]-T[0]),
+        K_DRAG*(T[0]-T[1]+T[2]-T[3])
+    };
 
-  float U_new = env->vel[0] + U_dot * dt;
-  float V_new = env->vel[1] + V_dot * dt;
-  float W_new = env->vel[2] + W_dot * dt;
+  for (int i = 0; i < 3; i++) {
+    M[i] -= K_ANG_DAMP * env->omega[i];
+  }
 
-  float P_new = env->angular_vel[0] + P_dot * dt;
-  float Q_new = env->angular_vel[1] + Q_dot * dt;
-  float R_new = env->angular_vel[2] + R_dot * dt;
+    float F_world[3], a[3];
+    quat_rotate(env->quat, F_body, F_world);
+    scalmul3(F_world, 1.0f/MASS, a);
+    a[2] -= GRAVITY;
 
-  float phi_dot = env->angular_vel[0] + sin(env->angles[0])*tan(env->angles[1])*env->angular_vel[1] + cos(env->angles[0])*tan(env->angles[1])*env->angular_vel[2];
-  float theta_dot = cos(env->angles[0])*env->angular_vel[1] - sin(env->angles[0])*env->angular_vel[2]; 
-  float psi_dot = (sin(env->angles[0])/cos(env->angles[1]))*env->angular_vel[1] + (cos(env->angles[0])/cos(env->angles[1]))*env->angular_vel[2];
+    float I_omega[3] = {IXX*env->omega[0], IYY*env->omega[1], IZZ*env->omega[2]};
+    float omega_x_Iw[3]; cross3(env->omega, I_omega, omega_x_Iw);
+    float omega_dot[3] = {
+        (M[0]-omega_x_Iw[0]) / IXX,
+        (M[1]-omega_x_Iw[1]) / IYY,
+        (M[2]-omega_x_Iw[2]) / IZZ
+    };
 
-  // 1) grab your updated body-frame velocities
-  float U = U_new, V = V_new, W = W_new;
+    float omega_q[4] = {0.0f, env->omega[0], env->omega[1], env->omega[2]};
+    float q_dot[4]; quat_mul(env->quat, omega_q, q_dot);
+    for (int i = 0; i < 4; i++) q_dot[i] *= 0.5f;
 
-  // 2) unpack current Euler angles
-  float phi   = env->angles[0];
-  float theta = env->angles[1];
-  float psi   = env->angles[2];
-
-  float cphi = cosf(phi),  sphi = sinf(phi);
-  float cth  = cosf(theta),sth  = sinf(theta);
-  float cps  = cosf(psi),  sps  = sinf(psi);
-
-  // 3) build body→world rotation matrix Rbw
-  float Rbw[3][3] = {
-    { cth*cps,                   sphi*sth*cps - cphi*sps,   cphi*sth*cps + sphi*sps },
-    { cth*sps,                   sphi*sth*sps + cphi*cps,   cphi*sth*sps - sphi*cps },
-    { -sth,                      sphi*cth,                  cphi*cth                }
-  };
-
-  // 4) rotate into world frame
-  float world_vel[3];
-  world_vel[0] = Rbw[0][0]*U + Rbw[0][1]*V + Rbw[0][2]*W;
-  world_vel[1] = Rbw[1][0]*U + Rbw[1][1]*V + Rbw[1][2]*W;
-  world_vel[2] = Rbw[2][0]*U + Rbw[2][1]*V + Rbw[2][2]*W;
-
-  // 5) integrate position in world coords
-  float X_new = env->pos[0] + world_vel[0] * dt;
-  float Y_new = env->pos[1] + world_vel[1] * dt;
-  float Z_new = env->pos[2] + world_vel[2] * dt;
-
-  // clamp & store
-  env->next_pos[0] = X_new;
-  env->next_pos[1] = Y_new;
-  env->next_pos[2] = Z_new;
-
-  clamp3(env->next_pos, -10, 10);
-
-  env->pos[0] = env->next_pos[0];
-  env->pos[1] = env->next_pos[1];
-  env->pos[2] = env->next_pos[2];
+    for (int i = 0; i < 3; i++) {
+        env->pos[i]   += env->vel[i]  * DT;
+        env->vel[i]   += a[i]         * DT;
+        env->omega[i] += omega_dot[i] * DT;
+    }
+    for (int i = 0; i < 4; i++) {
+        env->quat[i]  += q_dot[i]    * DT;
+    }
+    quat_normalize(env->quat);
 
 
-  float phi_new = env->angles[0] + phi_dot * dt;
-  float theta_new = env->angles[1] + theta_dot * dt;
-  float psi_new = env->angles[2] + psi_dot * dt;
+  bool out_of_bounds = false;
+  for (int i = 0; i < 3; i++) {
+      if (env->pos[i] < -10.0f || env->pos[i] > 10.0f) {
+          out_of_bounds = true;
+          break;
+      }
+  }
+  
+  if (out_of_bounds) {
+      env->rewards[0] -= 1;
+      env->log.episode_return -= 1;
+      env->terminals[0] = 1;
+      add_log(env->log_buffer, &env->log);
+      c_reset(env);
+      compute_observations(env);
+      return;
+  }
 
-  // updates old variables
-  env->next_pos[0] = X_new;
-  env->next_pos[1] = Y_new;
-  env->next_pos[2] = Z_new;  
-  clamp3(env->next_pos, -10, 10);
-
-  // keeping this for reward calcs later
-  env->pos[0] = env->next_pos[0];
-  env->pos[1] = env->next_pos[1];
-  env->pos[2] = env->next_pos[2];
-
-  env->vel[0] = U_new;
-  env->vel[1] = V_new;
-  env->vel[2] = W_new;
-
-  env->angles[0] = phi_new;
-  env->angles[1] = theta_new;
-  env->angles[2] = psi_new;
-
-  env->angular_vel[0] = P_new;
-  env->angular_vel[1] = Q_new;
-  env->angular_vel[2] = R_new;
-
-
-  sub3(env->next_pos, env->move_target, env->vec_to_target);
+  sub3(env->pos, env->move_target, env->vec_to_target);
 
   if (norm3(env->vec_to_target) < 1.5) {
     env->rewards[0] += 1;
