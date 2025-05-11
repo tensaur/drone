@@ -15,11 +15,13 @@
 #define IZZ       0.009f   // kgm^2
 #define ARM_LEN   0.225f   // m
 #define K_THRUST  3e-5f    // thrust coefficient
+#define K_ANG_DAMP 0.05f   // tune this
 #define K_DRAG    1e-7f    // drag (torque) coefficient
-#define GRAVITY   9.81f     // m/s^2
-#define MAX_RPM   1000.0f  // rad/s
-#define K_ANG_DAMP 0.05f    // tune this
+#define GRAVITY   9.81f    // m/s^2
 
+#define MAX_RPM   1000.0f  // rad/s
+#define MAX_VEL   5.0f     // m/s
+#define MAX_OMEGA 10.0f    // rad/s
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -241,34 +243,34 @@ void compute_observations(Drone *env) {
   env->observations[8] = env->quat[2];
   env->observations[9] = env->quat[3];
 
-  env->observations[10] = env->vel[0];
-  env->observations[11] = env->vel[1];
-  env->observations[12] = env->vel[2];
+  env->observations[10] = env->vel[0] / MAX_VEL;
+  env->observations[11] = env->vel[1] / MAX_VEL;
+  env->observations[12] = env->vel[2] / MAX_VEL;
 
-  env->observations[13] = env->omega[0];
-  env->observations[14] = env->omega[1];
-  env->observations[15] = env->omega[2];
+  env->observations[13] = env->omega[0] / MAX_OMEGA;
+  env->observations[14] = env->omega[1] / MAX_OMEGA;
+  env->observations[15] = env->omega[2] / MAX_OMEGA;
 }
 
 void c_reset(Drone *env) {
   env->log = (Log){0};
 
   // env
-  env->n_targets = 1;
+  env->n_targets = 5;
   env->moves_left = 1000;
 
-  env->move_target[0] = rndf(-10, 10);
-  env->move_target[1] = rndf(-10, 10);
-  env->move_target[2] = rndf(-10, 10);
+  env->move_target[0] = rndf(-9, 9);
+  env->move_target[1] = rndf(-9, 9);
+  env->move_target[2] = rndf(-9, 9);
 
-  env->look_target[0] = rndf(-10, 10);
-  env->look_target[1] = rndf(-10, 10);
-  env->look_target[2] = rndf(-10, 10);
+  env->look_target[0] = rndf(-9, 9);
+  env->look_target[1] = rndf(-9, 9);
+  env->look_target[2] = rndf(-9, 9);
 
   // state
-  env->pos[0] = rndf(-10, 10);
-  env->pos[1] = rndf(-10, 10);
-  env->pos[2] = rndf(-10, 10);
+  env->pos[0] = rndf(-9, 9);
+  env->pos[1] = rndf(-9, 9);
+  env->pos[2] = rndf(-9, 9);
 
   env->vel[0] = 0.0f;
   env->vel[1] = 0.0f;
@@ -288,6 +290,10 @@ void c_reset(Drone *env) {
 
 void c_step(Drone *env) {
   clamp4(env->actions, -1.0f, 1.0f);
+
+  float prev_vec[3];
+  sub3(env->pos, env->move_target, prev_vec);
+  float prev_dist = norm3(prev_vec);
 
   env->tick += 1;
   env->log.episode_length += 1;
@@ -334,11 +340,14 @@ void c_step(Drone *env) {
         env->vel[i]   += a[i]         * DT;
         env->omega[i] += omega_dot[i] * DT;
     }
+
+    clamp3(env->vel,   -MAX_VEL,   MAX_VEL);
+    clamp3(env->omega, -MAX_OMEGA, MAX_OMEGA);
+
     for (int i = 0; i < 4; i++) {
         env->quat[i]  += q_dot[i]    * DT;
     }
     quat_normalize(env->quat);
-
 
   bool out_of_bounds = false;
   for (int i = 0; i < 3; i++) {
@@ -359,6 +368,11 @@ void c_step(Drone *env) {
   }
 
   sub3(env->pos, env->move_target, env->vec_to_target);
+
+  float curr_dist = norm3(env->vec_to_target);
+  float dist = prev_dist - curr_dist;
+  env->rewards[0] += dist;
+  env->log.episode_return += dist;
 
   if (norm3(env->vec_to_target) < 1.5) {
     env->rewards[0] += 1;
