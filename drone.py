@@ -106,6 +106,15 @@ class Visualiser3D:
                 color="black",
                 linewidth=2,
             )
+        
+        thrust_dir = R @ np.array([0.0, 0.0, 1.0])
+        arrow_base = origin + thrust_dir * 0.2
+        self.ax.quiver(
+            arrow_base[0], arrow_base[1], arrow_base[2],
+            thrust_dir[0], thrust_dir[1], thrust_dir[2],
+            length=2.0, normalize=True,
+            color="purple", arrow_length_ratio=0.3, linewidth=2
+        )
 
         # legend
         self.ax.legend(prop={"size": 7}, markerscale=0.6)
@@ -139,7 +148,7 @@ if __name__ == "__main__":
     print(args)
 
     env = Drone(num_envs=1)
-    model = torch.load("experiments/drone-1adb97ab/model_000200.pt")
+    model = torch.load("experiments/drone-281a89cf/model_004600.pt")
 
     # obs, _ = env.reset(n_targets=args.n)
     obs, _ = env.reset()
@@ -159,10 +168,10 @@ if __name__ == "__main__":
         print("action")
         print(action)
 
-        #action = np.array([0,0,0,0])
+        #action = np.array([-1,-1,-1,-1])
 
-        #if len(move_targets) < 50:
-        #    action = np.array([-1,-1,-0.8,-0.8])
+        #if len(move_targets) > 100:
+        #    action = np.array([1,1,1,1])
 
         thrusts.append(np.clip(np.array(action).flatten(), -1, 1))
         
@@ -177,7 +186,6 @@ if __name__ == "__main__":
             break
 
     positions = np.array(positions)
-    print(positions)
     move_targets = np.array(move_targets)
     look_targets = np.array(look_targets)
     rolls = np.array(rolls)

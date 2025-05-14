@@ -20,7 +20,7 @@
 #define GRAVITY   9.81f    // m/s^2
 
 #define MAX_RPM   1000.0f  // rad/s
-#define MAX_VEL   5.0f     // m/s
+#define MAX_VEL   10.0f     // m/s
 #define MAX_OMEGA 10.0f    // rad/s
 
 // ------------------------------------------------------------
@@ -369,10 +369,10 @@ void c_step(Drone *env) {
 
   sub3(env->pos, env->move_target, env->vec_to_target);
 
-  float curr_dist = norm3(env->vec_to_target);
-  float dist = prev_dist - curr_dist;
-  env->rewards[0] += dist;
-  env->log.episode_return += dist;
+  //float curr_dist = norm3(env->vec_to_target);
+  //float dist = prev_dist - curr_dist;
+  //env->rewards[0] += dist;
+  //env->log.episode_return += dist;
 
   if (norm3(env->vec_to_target) < 1.5) {
     env->rewards[0] += 1;
