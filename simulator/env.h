@@ -17,11 +17,12 @@
 #define K_THRUST  3e-5f    // thrust coefficient
 #define K_ANG_DAMP 0.05f   // tune this
 #define K_DRAG    1e-7f    // drag (torque) coefficient
+#define B_DRAG 0.1f   // linear drag coefficient (tunable)
 #define GRAVITY   9.81f    // m/s^2
 
 #define MAX_RPM   1000.0f  // rad/s
-#define MAX_VEL   10.0f     // m/s
-#define MAX_OMEGA 10.0f    // rad/s
+#define MAX_VEL   50.0f     // m/s
+#define MAX_OMEGA 50.0f    // rad/s
 
 // ------------------------------------------------------------
 // Logging functions for training loop
@@ -291,6 +292,7 @@ void c_reset(Drone *env) {
 void c_step(Drone *env) {
   clamp4(env->actions, -1.0f, 1.0f);
 
+  // distance to target pre-step for rew calcs
   float prev_vec[3];
   sub3(env->pos, env->move_target, prev_vec);
   float prev_dist = norm3(prev_vec);
@@ -300,55 +302,76 @@ void c_step(Drone *env) {
   env->rewards[0] = 0;
   env->terminals[0] = 0;
 
+  // motor thrusts
   float T[4];
   for (int i = 0; i < 4; i++) {
     float rpm = (env->actions[i] + 1.0f)*0.5f * MAX_RPM;
     T[i] = K_THRUST * rpm * rpm;
   }
 
+  // body frame net force
   float F_body[3] = {0.0f, 0.0f, T[0]+T[1]+T[2]+T[3]};
 
+  // body frame torques
   float M[3] = {
         ARM_LEN*(T[1]-T[3]),
         ARM_LEN*(T[2]-T[0]),
         K_DRAG*(T[0]-T[1]+T[2]-T[3])
     };
-
+  
+  // applies angular damping to torques
   for (int i = 0; i < 3; i++) {
     M[i] -= K_ANG_DAMP * env->omega[i];
   }
 
-    float F_world[3], a[3];
-    quat_rotate(env->quat, F_body, F_world);
-    scalmul3(F_world, 1.0f/MASS, a);
-    a[2] -= GRAVITY;
+  // body frame force -> world frame force
+  float F_world[3];
+  quat_rotate(env->quat, F_body, F_world);
 
-    float I_omega[3] = {IXX*env->omega[0], IYY*env->omega[1], IZZ*env->omega[2]};
-    float omega_x_Iw[3]; cross3(env->omega, I_omega, omega_x_Iw);
-    float omega_dot[3] = {
-        (M[0]-omega_x_Iw[0]) / IXX,
-        (M[1]-omega_x_Iw[1]) / IYY,
-        (M[2]-omega_x_Iw[2]) / IZZ
-    };
+  // world frame linear drag
+  for (int i = 0; i < 3; i++) {
+    F_world[i] -= B_DRAG * env->vel[i];
+  }
 
-    float omega_q[4] = {0.0f, env->omega[0], env->omega[1], env->omega[2]};
-    float q_dot[4]; quat_mul(env->quat, omega_q, q_dot);
-    for (int i = 0; i < 4; i++) q_dot[i] *= 0.5f;
+  // world frame gravity
+  float a[3];
+  scalmul3(F_world, 1.0f/MASS, a);
+  a[2] -= GRAVITY;
 
-    for (int i = 0; i < 3; i++) {
-        env->pos[i]   += env->vel[i]  * DT;
-        env->vel[i]   += a[i]         * DT;
-        env->omega[i] += omega_dot[i] * DT;
-    }
+  // world frame gyroscopic effects
+  //float I_omega[3] = {IXX*env->omega[0], IYY*env->omega[1], IZZ*env->omega[2]};
+  //float omega_x_Iw[3]; cross3(env->omega, I_omega, omega_x_Iw);
+  //float omega_dot[3] = {
+  //    (M[0]-omega_x_Iw[0]) / IXX,
+  //    (M[1]-omega_x_Iw[1]) / IYY,
+  //    (M[2]-omega_x_Iw[2]) / IZZ
+  //};
 
-    clamp3(env->vel,   -MAX_VEL,   MAX_VEL);
-    clamp3(env->omega, -MAX_OMEGA, MAX_OMEGA);
+  // integrates quaternion  
+  float omega_q[4] = {0.0f, env->omega[0], env->omega[1], env->omega[2]};
+  float q_dot[4]; 
 
-    for (int i = 0; i < 4; i++) {
-        env->quat[i]  += q_dot[i]    * DT;
-    }
-    quat_normalize(env->quat);
+  quat_mul(env->quat, omega_q, q_dot);
 
+  for (int i = 0; i < 4; i++) {
+    q_dot[i] *= 0.5f;
+  }
+
+  for (int i = 0; i < 3; i++) {
+      env->pos[i]   += env->vel[i]  * DT;
+      env->vel[i]   += a[i]         * DT;
+      env->omega[i] += omega_dot[i] * DT;
+  }
+
+  clamp3(env->vel,   -MAX_VEL,   MAX_VEL);
+  clamp3(env->omega, -MAX_OMEGA, MAX_OMEGA);
+
+  for (int i = 0; i < 4; i++) {
+    env->quat[i]  += q_dot[i]    * DT;
+  }
+  quat_normalize(env->quat);
+
+  // check out of bounds
   bool out_of_bounds = false;
   for (int i = 0; i < 3; i++) {
       if (env->pos[i] < -10.0f || env->pos[i] > 10.0f) {
@@ -356,7 +379,8 @@ void c_step(Drone *env) {
           break;
       }
   }
-  
+
+  // give rewards
   if (out_of_bounds) {
       env->rewards[0] -= 1;
       env->log.episode_return -= 1;
@@ -369,10 +393,10 @@ void c_step(Drone *env) {
 
   sub3(env->pos, env->move_target, env->vec_to_target);
 
-  //float curr_dist = norm3(env->vec_to_target);
-  //float dist = prev_dist - curr_dist;
-  //env->rewards[0] += dist;
-  //env->log.episode_return += dist;
+  float curr_dist = norm3(env->vec_to_target);
+  float dist = prev_dist - curr_dist;
+  env->rewards[0] += dist;
+  env->log.episode_return += dist;
 
   if (norm3(env->vec_to_target) < 1.5) {
     env->rewards[0] += 1;

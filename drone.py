@@ -148,7 +148,7 @@ if __name__ == "__main__":
     print(args)
 
     env = Drone(num_envs=1)
-    model = torch.load("experiments/drone-281a89cf/model_004600.pt")
+    model = torch.load("experiments/drone-1ea80210/model_001050.pt")
 
     # obs, _ = env.reset(n_targets=args.n)
     obs, _ = env.reset()
@@ -162,11 +162,11 @@ if __name__ == "__main__":
 
     while True:
         obs = torch.tensor([obs], dtype=torch.float32)
-        print("obs:")
-        print(obs)
+        #print("obs:")
+        #print(obs)
         action, _, _, _ = model(obs)
-        print("action")
-        print(action)
+        #print("action")
+        #print(action)
 
         #action = np.array([-1,-1,-1,-1])
 
