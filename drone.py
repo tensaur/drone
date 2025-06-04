@@ -148,7 +148,7 @@ if __name__ == "__main__":
     print(args)
 
     env = Drone(num_envs=1)
-    model = torch.load("experiments/drone-1ea80210/model_001050.pt")
+    model = torch.load("experiments/drone-225b534b/model_001500.pt")
 
     # obs, _ = env.reset(n_targets=args.n)
     obs, _ = env.reset()
