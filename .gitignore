@@ -1,3 +1,7 @@
+# puffer
+resources
+experiments/
+
 venv/
 .DS_Store
 **/__pycache__
