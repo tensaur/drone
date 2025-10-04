@@ -1,0 +1,3 @@
+[submodule "pufferlib"]
+	path = pufferlib
+	url = https://github.com/pufferai/pufferlib
