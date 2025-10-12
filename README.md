@@ -4,12 +4,6 @@
 
 This project was presented at the 2025 [Warwick Artificial Intelligence](https://warwick.ai) summit. The slides for this talk are available [here](./docs/summit.pdf).
 
-## Usage
-
-## Demo
-
-https://github.com/user-attachments/assets/049ec4a9-afa6-47f5-87f6-b8ac20ddebcd
-
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first
