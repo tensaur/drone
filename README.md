@@ -8,7 +8,7 @@ This project was presented at the 2025 [Warwick Artificial Intelligence](https:/
 
 ## Demo
 
-https://github.com/user-attachments/assets/049ec4a9-afa6-47f5-87f6-b8ac20ddebcd
+https://github.com/user-attachments/assets/6224c872-db01-47dd-8682-9fa20bcf34e5
 
 ## Contributing
 
