@@ -1,3 +1,6 @@
 [submodule "pufferlib"]
 	path = pufferlib
 	url = https://github.com/pufferai/pufferlib
+[submodule "crazyflie-firmware"]
+	path = crazyflie-firmware
+	url = https://github.com/bitcraze/crazyflie-firmware
