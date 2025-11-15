@@ -7,14 +7,18 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "stabilizer_types.h"
+#include "param.h"
+
+#include "puffernet.h"
+
 // Edit the debug name to get nice debug prints
 #define DEBUG_MODULE "MYCONTROLLER"
 #include "debug.h"
 
 
-#include "stabilizer_types.h"
-
 static uint64_t controller_tick = 0; 
+static uint8_t use_rl = 0;
 static float state_input[13];
 static setpoint_t last_setpoint;
 
@@ -66,6 +70,7 @@ void controllerOutOfTreeInit() {
 
   // Call the PID controller instead in this example to make it possible to fly
   controllerPidInit();
+
   DEBUG_PRINT("ur nan is fat brev\n");
 }
 
@@ -81,7 +86,16 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
 
   // Call the PID controller instead in this example to make it possible to fly
   state_input[0] = state->position.x;
-  //controllerPid(control, setpoint, sensors, state, tick);
+  if (use_rl){
+    if (controller_tick % 200 == 0) { 
+      DEBUG_PRINT("using rl controller\n");
+    }
+  }
+  controllerPid(control, setpoint, sensors, state, tick);
   trigger_every(controller_tick);
   controller_tick++;
 }
+
+PARAM_GROUP_START(pufferdrone)
+PARAM_ADD(PARAM_UINT8, use_rl, &use_rl)
+PARAM_GROUP_STOP(pufferdrone)
