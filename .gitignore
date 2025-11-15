@@ -1,3 +1,7 @@
+# crazyflie
+*.o
+*.cmd
+
 # puffer
 resources
 experiments/
@@ -11,4 +15,3 @@ build/
 *.so
 *.pth
 *.pt
-simulator/cy_env.c
