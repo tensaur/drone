@@ -1,12 +1,11 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <math.h>
-#include <assert.h>
+//#include <assert.h>
 
 #include "FreeRTOS.h"
 
-// Create a calloc wrapper that zeros memory
 static inline void* embedded_calloc(size_t count, size_t size) {
     size_t total = count * size;
     void* ptr = pvPortMalloc(total);
@@ -82,7 +81,7 @@ struct Weights {
     int idx;
 };
 
-void _load_weights(const char* filename, float* weights, size_t num_weights) {
+/*void _load_weights(const char* filename, float* weights, size_t num_weights) {
     FILE* file = fopen(filename, "rb");
     if (!file) {
         perror("Error opening file");
@@ -103,12 +102,12 @@ Weights* load_weights(const char* filename, size_t num_weights) {
     weights->size = num_weights;
     weights->idx = 0;
     return weights;
-}
+}*/
 
 float* get_weights(Weights* weights, int num_weights) {
     float* data = &weights->data[weights->idx];
     weights->idx += num_weights;
-    assert(weights->idx <= weights->size);
+    //assert(weights->idx <= weights->size);
     return data;
 }
 

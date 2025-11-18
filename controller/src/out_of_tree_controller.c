@@ -11,6 +11,7 @@
 #include "param.h"
 
 #include "puffernet.h"
+#include "weights.h"
 
 // Edit the debug name to get nice debug prints
 #define DEBUG_MODULE "MYCONTROLLER"
@@ -19,8 +20,11 @@
 
 static uint64_t controller_tick = 0; 
 static uint8_t use_rl = 0;
-static float state_input[13];
+static float state_input[29];
+static float actions[4];
 static setpoint_t last_setpoint;
+
+
 
 // We still need an appMain() function, but we will not really use it. Just let it quietly sleep.
 void appMain() {
@@ -53,7 +57,6 @@ static inline void trigger_every(uint64_t controller_tick){
       every_1000ms();
     }
   }
-  
 }
 
 
@@ -65,6 +68,9 @@ static inline void trigger_every(uint64_t controller_tick){
 // no need to include the pid controller.
 #include "controller_pid.h"
 
+static Weights w;
+static LinearContLSTM* puffer_controller;
+
 void controllerOutOfTreeInit() {
   // Initialize your controller data here...
 
@@ -72,6 +78,14 @@ void controllerOutOfTreeInit() {
   controllerPidInit();
 
   DEBUG_PRINT("ur nan is fat brev\n");
+
+  w.data = (float*)puffer_weights;
+  w.size = sizeof(puffer_weights) / sizeof(puffer_weights[0]);
+  w.idx = 0;
+
+  int logit_sizes[1] = {4};
+  puffer_controller = make_linearcontlstm(&w, 1, 29/*input dim*/, logit_sizes, 1);
+
 }
 
 bool controllerOutOfTreeTest() {
@@ -89,6 +103,9 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
   if (use_rl){
     if (controller_tick % 200 == 0) { 
       DEBUG_PRINT("using rl controller\n");
+      DEBUG_PRINT("weight 0: %d\n", (int)w.data[0]);
+      forward_linearcontlstm(puffer_controller, state_input, actions);
+      DEBUG_PRINT("weight 0: %f\n", (double)actions[0]);
     }
   }
   controllerPid(control, setpoint, sensors, state, tick);
