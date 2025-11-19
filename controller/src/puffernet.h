@@ -9,6 +9,7 @@ extern "C" {
 
 /* ===== RNG ===== */
 
+int rand(void);
 double randn(double mean, double std);
 
 /* ===== Arena allocator ===== */
