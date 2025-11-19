@@ -13,18 +13,22 @@
 
 #define DEBUG_MODULE "PUFFERDRONE"
 #include "debug.h"
+#include "log.h"
 
 #include "controller.h"
 #include "controller_pid.h"
 
 #include "puffernet.h"
 #include "weights.h"
+#include "dronelib.h"
+
+#define toDeg 3.14159265358979323846f / 180.0f
 
 bool puffer_use_direct_motor_output = false;
 
 static uint64_t controller_tick = 0;
 static uint8_t use_rl = 0;
-static float state_input[41];
+static float state_input[16];
 static float actions_output[4];
 static uint16_t motor_cmd[4];
 const uint8_t motors[4] = {MOTOR_M1, MOTOR_M2, MOTOR_M3, MOTOR_M4};
@@ -52,7 +56,7 @@ void controllerOutOfTreeInit() {
 
   int logit_sizes[1] = {4};
   // this will not error if you pick the wrong input dim!
-  puffer_controller = make_linearcontlstm(&w, 1, 41/*input dim*/, logit_sizes, 1);
+  puffer_controller = make_linearcontlstm(&w, 1, 16/*input dim*/, logit_sizes, 1);
 
   DEBUG_PRINT("Puffer drone controller initialized.\n");
   DEBUG_PRINT("Weights used: %d / %d\n", w.idx, w.size);
@@ -64,8 +68,48 @@ bool controllerOutOfTreeTest() {
 }
 
 void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const sensorData_t *sensors, const state_t *state, const uint32_t tick) {
-  state_input[0] = state->position.x;
+  Quat q = {
+    state->attitudeQuaternion.w,
+    state->attitudeQuaternion.x,
+    state->attitudeQuaternion.y,
+    state->attitudeQuaternion.z
+  };
+  Vec3 v = {
+    state->velocity.x,
+    state->velocity.y,
+    state->velocity.z
+  };
 
+  Vec3 toTarget = {
+    setpoint->position.x - state->position.x,
+    setpoint->position.x - state->position.x,
+    setpoint->position.x - state->position.x
+  };
+
+  Quat q_inv = quat_inverse(q);
+  Vec3 linear_vel_body = quat_rotate(q_inv, v);
+
+  state_input[0] = linear_vel_body.x / BASE_MAX_VEL;
+  state_input[1] = linear_vel_body.y / BASE_MAX_VEL;
+  state_input[2] = linear_vel_body.z / BASE_MAX_VEL;
+
+  state_input[3] = sensors->gyro.x * toDeg / BASE_MAX_OMEGA;
+  state_input[4] = sensors->gyro.y * toDeg / BASE_MAX_OMEGA;
+  state_input[5] = sensors->gyro.z * toDeg / BASE_MAX_OMEGA;
+
+  state_input[6] = q.w;
+  state_input[7] = q.x;
+  state_input[8] = q.y;
+  state_input[9] = q.z;
+
+  state_input[10] = toTarget.x / GRID_X;
+  state_input[11] = toTarget.y / GRID_Y;
+  state_input[12] = toTarget.z / GRID_Z;
+
+  state_input[13] = clip(toTarget.x, -1.0f, 1.0f);
+  state_input[14] = clip(toTarget.y, -1.0f, 1.0f);
+  state_input[15] = clip(toTarget.z, -1.0f, 1.0f);
+  
   if (use_rl){
     puffer_use_direct_motor_output = true;
       
@@ -75,11 +119,7 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
       float scaled = (actions_output[i] + 1)/2;
       if (scaled < 0) scaled = 0;
       if (scaled > 1) scaled = 1;
-      scaled = 0.0f;
-
-      if (i == 3) {
-        scaled = 0.1f;
-      }
+      //scaled = 0.2f;
 
       motor_cmd[i] = scaled * UINT16_MAX;
       motorsSetRatio(motors[i], motor_cmd[i]);
@@ -98,6 +138,13 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
 
   controller_tick++;
 }
+
+/*LOG_GROUP_START(motor_commands)
+LOG_ADD(LOG_UINT16, m1, &motor_cmd[0])
+LOG_ADD(LOG_UINT16, m2, &motor_cmd[1])
+LOG_ADD(LOG_UINT16, m3, &motor_cmd[2])
+LOG_ADD(LOG_UINT16, m4, &motor_cmd[3])
+LOG_GROUP_STOP(motor_commands)*/
 
 PARAM_GROUP_START(pufferdrone)
 PARAM_ADD(PARAM_UINT8, use_rl, &use_rl)
