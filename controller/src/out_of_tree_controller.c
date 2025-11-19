@@ -51,8 +51,11 @@ void controllerOutOfTreeInit() {
   w.idx = 0;
 
   int logit_sizes[1] = {4};
-  puffer_controller = make_linearcontlstm(&w, 1, 29/*input dim*/, logit_sizes, 1);
+  // this will not error if you pick the wrong input dim!
+  puffer_controller = make_linearcontlstm(&w, 1, 41/*input dim*/, logit_sizes, 1);
 
+  DEBUG_PRINT("Puffer drone controller initialized.\n");
+  DEBUG_PRINT("Weights used: %d / %d\n", w.idx, w.size);
 }
 
 bool controllerOutOfTreeTest() {
@@ -75,7 +78,7 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
       scaled = 0.0f;
 
       if (i == 3) {
-        scaled = 0.2f;
+        scaled = 0.1f;
       }
 
       motor_cmd[i] = scaled * UINT16_MAX;
@@ -85,6 +88,12 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
   } else {
     puffer_use_direct_motor_output = false;
     controllerPid(control, setpoint, sensors, state, tick);
+  }
+
+  if (controller_tick % 1000 == 0) {
+    DEBUG_PRINT("Last setpoint: x disposition/mode %f/%f/%d\n", (double)setpoint->position.x, (double)setpoint->velocity.x, setpoint->mode.x);
+    DEBUG_PRINT("Last setpoint: y disposition/mode %f/%f/%d\n", (double)setpoint->position.y, (double)setpoint->velocity.y, setpoint->mode.y);
+    DEBUG_PRINT("Last setpoint: z disposition/mode %f/%f/%d\n\n", (double)setpoint->position.z, (double)setpoint->velocity.z, setpoint->mode.z);
   }
 
   controller_tick++;
