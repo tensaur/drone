@@ -22,7 +22,7 @@
 #include "weights.h"
 #include "dronelib.h"
 
-#define toDeg 3.14159265358979323846f / 180.0f
+#define toRad 3.14159265358979323846f / 180.0f
 
 bool puffer_use_direct_motor_output = false;
 
@@ -82,8 +82,8 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
 
   Vec3 toTarget = {
     setpoint->position.x - state->position.x,
-    setpoint->position.x - state->position.x,
-    setpoint->position.x - state->position.x
+    setpoint->position.y - state->position.y,
+    setpoint->position.z - state->position.z
   };
 
   Quat q_inv = quat_inverse(q);
@@ -93,9 +93,9 @@ void controllerOutOfTree(control_t *control, const setpoint_t *setpoint, const s
   state_input[1] = linear_vel_body.y / BASE_MAX_VEL;
   state_input[2] = linear_vel_body.z / BASE_MAX_VEL;
 
-  state_input[3] = sensors->gyro.x * toDeg / BASE_MAX_OMEGA;
-  state_input[4] = sensors->gyro.y * toDeg / BASE_MAX_OMEGA;
-  state_input[5] = sensors->gyro.z * toDeg / BASE_MAX_OMEGA;
+  state_input[3] = sensors->gyro.x * toRad / BASE_MAX_OMEGA;
+  state_input[4] = sensors->gyro.y * toRad / BASE_MAX_OMEGA;
+  state_input[5] = sensors->gyro.z * toRad / BASE_MAX_OMEGA;
 
   state_input[6] = q.w;
   state_input[7] = q.x;
