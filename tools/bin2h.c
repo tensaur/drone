@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     // Write header file
     fprintf(out, "#ifndef %s\n", guard_name);
     fprintf(out, "#define %s\n\n", guard_name);
-    fprintf(out, "// Auto-generated from %s\n", input_file);
+    fprintf(out, "// Generated from %s\n", input_file);
     fprintf(out, "// Total weights: %zu\n", num_floats);
     fprintf(out, "// File size: %ld bytes\n\n", file_size);
 

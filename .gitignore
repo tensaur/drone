@@ -5,6 +5,7 @@
 # puffer
 resources
 experiments/
+*.bin
 
 venv/
 .DS_Store
