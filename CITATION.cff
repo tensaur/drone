@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Turner"
+  given-names: "Sam"
+  orcid: "https://orcid.org/0009-0000-8992-4274"
+- family-names: "Sanders"
+  given-names: "Finlay"
+title: "Reinforcement Learning Drone Controller and Simulation"
+version: 1.0.0
+date-released: 2025-05-03
+url: "https://github.com/tensaur/drone"
