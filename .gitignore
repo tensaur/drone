@@ -6,6 +6,7 @@
 resources
 experiments/
 *.bin
+env_binding.h
 
 venv/
 .DS_Store
