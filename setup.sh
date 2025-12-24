@@ -32,6 +32,7 @@ echo -e "${GREEN}OK!${NC}"
 echo -n "Linking dev drone env to overwrite demo version in submodule... "
 rm -rf ./pufferlib/pufferlib/ocean/drone
 ln -s "$(pwd)/env" ./pufferlib/pufferlib/ocean/drone
+ln -sf "$(pwd)/config/drone.ini" ./pufferlib/pufferlib/config/ocean/drone.ini
 ln -sf ./pufferlib/pufferlib/ocean/env_binding.h ./env_binding.h
 echo -e "${GREEN}OK!${NC}"
 
