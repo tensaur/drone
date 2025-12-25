@@ -13,24 +13,24 @@
 #define WIDTH 1080
 #define HEIGHT 720
 #define TRAIL_LENGTH 50
-#define HORIZON 1024
 
-// Physical constants for the drone
-#define BASE_MASS 1.0f       // kg
-#define BASE_IXX 0.01f       // kgm^2
-#define BASE_IYY 0.01f       // kgm^2
-#define BASE_IZZ 0.02f       // kgm^2
-#define BASE_ARM_LEN 0.1f    // m
-#define BASE_K_THRUST 3e-5f  // thrust coefficient
-#define BASE_K_ANG_DAMP 0.2f // angular damping coefficient
-#define BASE_K_DRAG 1e-6f    // drag (torque) coefficient
-#define BASE_B_DRAG 0.1f     // linear drag coefficient
-#define BASE_GRAVITY 9.81f   // m/s^2
-#define BASE_MAX_RPM 750.0f  // rad/s
-#define BASE_MAX_VEL 50.0f   // m/s
-#define BASE_MAX_OMEGA 50.0f // rad/s
-#define BASE_K_MOT 0.1f      // s (Motor lag constant)
-#define BASE_J_MOT 1e-5f     // kgm^2 (Motor rotational inertia)
+// Crazyflie Physical Constants
+// https://github.com/arplaboratory/learning-to-fly
+#define BASE_MASS 0.027f            // kg
+#define BASE_IXX 3.85e-6f           // kgm²
+#define BASE_IYY 3.85e-6f           // kgm²
+#define BASE_IZZ 5.9675e-6f         // kgm²
+#define BASE_ARM_LEN 0.0396f        // m
+#define BASE_K_THRUST 3.16e-10f     // thrust coefficient
+#define BASE_K_DRAG 0.005964552f    // yaw moment constant
+#define BASE_GRAVITY 9.81f          // m/s^2
+#define BASE_MAX_RPM 21702.0f       // RPM
+#define BASE_K_MOT 0.15f            // s (RPM time constant)
+
+#define BASE_K_ANG_DAMP 0.0f        // angular damping coefficient
+#define BASE_B_DRAG 0.0f            // linear drag coefficient
+#define BASE_MAX_VEL 20.0f          // m/s
+#define BASE_MAX_OMEGA 20.0f        // rad/s
 
 // Simulation properties
 #define GRID_X 30.0f
@@ -41,7 +41,13 @@
 #define MARGIN_Z (GRID_Z - 1)
 #define RING_RADIUS 2.0f
 #define V_TARGET 0.05f
-#define DT 0.05f
+
+// Core Parameters
+#define HORIZON 1024
+#define DT 0.002f // 500 Hz
+#define ACTION_SUBSTEPS 5
+#define ACTION_DT (DT * (float)ACTION_SUBSTEPS) // 100 Hz
+
 #define DT_RNG 0.0f
 
 // Corner to corner distance
@@ -92,7 +98,7 @@ typedef struct {
 } State;
 
 typedef struct {
-    Vec3 vel;       // Derivative of position
+    Vec3 vel;         // Derivative of position
     Vec3 v_dot;       // Derivative of velocity
     Quat q_dot;       // Derivative of quaternion
     Vec3 w_dot;       // Derivative of angular velocity
@@ -100,23 +106,20 @@ typedef struct {
 } StateDerivative;
 
 typedef struct {
-    // Physical properties. Modeled as part of the drone
-    // to make domain randomization easier.
-    float mass; // kg
-    float ixx; // kgm^2
-    float iyy; // kgm^2
-    float izz; // kgm^2
-    float arm_len; // m
-    float k_thrust; // thrust coefficient
+    float mass;       // kg
+    float ixx;        // kgm^2
+    float iyy;        // kgm^2
+    float izz;        // kgm^2
+    float arm_len;    // m
+    float k_thrust;   // thrust coefficient (T = k * rpm^2)
     float k_ang_damp; // angular damping coefficient
-    float k_drag; // drag (torque) coefficient
-    float b_drag; // linear drag coefficient
-    float gravity; // m/s^2
-    float max_rpm; // rad/s
-    float max_vel; // m/s
-    float max_omega; // rad/s
-    float k_mot; // s
-    float j_mot; // kgm^2
+    float k_drag;     // yaw moment constant (torque-to-thrust ratio style)
+    float b_drag;     // linear drag coefficient
+    float gravity;    // m/s^2 (positive, world gravity points -z)
+    float max_rpm;    // RPM
+    float max_vel;    // m/s (observation clamp)
+    float max_omega;  // rad/s (observation clamp)
+    float k_mot;      // s (motor RPM time constant)
 } Params;
 
 typedef struct {
@@ -128,8 +131,7 @@ typedef struct {
     // current target
     Target* target;
 
-    // buffer agent can draw more targets from,
-    // allows agents to continue on their own separate paths
+    // target buffer
     Target* buffer;
     int buffer_idx;
     int buffer_size;
@@ -143,10 +145,8 @@ typedef struct {
 } Drone;
 
 static inline float clampf(float v, float min, float max) {
-    if (v < min)
-        return min;
-    if (v > max)
-        return max;
+    if (v < min) return min;
+    if (v > max) return max;
     return v;
 }
 
@@ -154,33 +154,15 @@ static inline float rndf(float a, float b) {
     return a + ((float)rand() / (float)RAND_MAX) * (b - a);
 }
 
-static inline Vec3 add3(Vec3 a, Vec3 b) { 
-    return (Vec3){a.x + b.x, a.y + b.y, a.z + b.z}; 
-}
+static inline Vec3 add3(Vec3 a, Vec3 b) { return (Vec3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+static inline Vec3 sub3(Vec3 a, Vec3 b) { return (Vec3){a.x - b.x, a.y - b.y, a.z - b.z}; }
+static inline Vec3 scalmul3(Vec3 a, float b) { return (Vec3){a.x * b, a.y * b, a.z * b}; }
 
-static inline Quat add_quat(Quat a, Quat b) { 
-    return (Quat){a.w + b.w, a.x + b.x, a.y + b.y, a.z + b.z}; 
-}
+static inline Quat add_quat(Quat a, Quat b) { return (Quat){a.w + b.w, a.x + b.x, a.y + b.y, a.z + b.z}; }
+static inline Quat scalmul_quat(Quat a, float b) { return (Quat){a.w * b, a.x * b, a.y * b, a.z * b}; }
 
-static inline Vec3 sub3(Vec3 a, Vec3 b) { 
-    return (Vec3){a.x - b.x, a.y - b.y, a.z - b.z}; 
-}
-
-static inline Vec3 scalmul3(Vec3 a, float b) { 
-    return (Vec3){a.x * b, a.y * b, a.z * b}; 
-}
-
-static inline Quat scalmul_quat(Quat a, float b) { 
-    return (Quat){a.w * b, a.x * b, a.y * b, a.z * b}; 
-}
-
-static inline float dot3(Vec3 a, Vec3 b) { 
-    return a.x * b.x + a.y * b.y + a.z * b.z; 
-}
-
-static inline float norm3(Vec3 a) { 
-    return sqrtf(dot3(a, a)); 
-}
+static inline float dot3(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+static inline float norm3(Vec3 a) { return sqrtf(dot3(a, a)); }
 
 static inline void clamp3(Vec3 *vec, float min, float max) {
     vec->x = clampf(vec->x, min, max);
@@ -205,28 +187,23 @@ static inline Quat quat_mul(Quat q1, Quat q2) {
 }
 
 static inline void quat_normalize(Quat *q) {
-    float n = sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
+    float n = sqrtf(q->w*q->w + q->x*q->x + q->y*q->y + q->z*q->z);
     if (n > 0.0f) {
-        q->w /= n;
-        q->x /= n;
-        q->y /= n;
-        q->z /= n;
+        q->w /= n; q->x /= n; q->y /= n; q->z /= n;
     }
 }
 
 static inline Vec3 quat_rotate(Quat q, Vec3 v) {
-    Quat qv = {0.0f, v.x, v.y, v.z};
+    Quat qv = (Quat){0.0f, v.x, v.y, v.z};
     Quat tmp = quat_mul(q, qv);
-    Quat q_conj = {q.w, -q.x, -q.y, -q.z};
+    Quat q_conj = (Quat){q.w, -q.x, -q.y, -q.z};
     Quat res = quat_mul(tmp, q_conj);
     return (Vec3){res.x, res.y, res.z};
 }
 
-static inline Quat quat_inverse(Quat q) { 
-    return (Quat){q.w, -q.x, -q.y, -q.z}; 
-}
+static inline Quat quat_inverse(Quat q) { return (Quat){q.w, -q.x, -q.y, -q.z}; }
 
-Quat rndquat() {
+static inline Quat rndquat(void) {
     float u1 = rndf(0.0f, 1.0f);
     float u2 = rndf(0.0f, 1.0f);
     float u3 = rndf(0.0f, 1.0f);
@@ -234,20 +211,19 @@ Quat rndquat() {
     float sqrt_1_minus_u1 = sqrtf(1.0f - u1);
     float sqrt_u1 = sqrtf(u1);
 
-    float pi_2_u2 = 2.0f * M_PI * u2;
-    float pi_2_u3 = 2.0f * M_PI * u3;
+    float pi_2_u2 = 2.0f * (float)M_PI * u2;
+    float pi_2_u3 = 2.0f * (float)M_PI * u3;
 
     Quat q;
     q.w = sqrt_1_minus_u1 * sinf(pi_2_u2);
     q.x = sqrt_1_minus_u1 * cosf(pi_2_u2);
     q.y = sqrt_u1 * sinf(pi_2_u3);
     q.z = sqrt_u1 * cosf(pi_2_u3);
-
     return q;
 }
 
-Target rndring(float radius) {
-    Target ring = {0};
+static inline Target rndring(float radius) {
+    Target ring = (Target){0};
 
     ring.pos.x = rndf(-GRID_X + 2*radius, GRID_X - 2*radius);
     ring.pos.y = rndf(-GRID_Y + 2*radius, GRID_Y - 2*radius);
@@ -255,59 +231,47 @@ Target rndring(float radius) {
 
     ring.orientation = rndquat();
 
-    Vec3 base_normal = {0.0f, 0.0f, 1.0f};
+    Vec3 base_normal = (Vec3){0.0f, 0.0f, 1.0f};
     ring.normal = quat_rotate(ring.orientation, base_normal);
 
     ring.radius = radius;
-
     return ring;
 }
 
-void init_drone(Drone* drone, float size, float dr) {
-    drone->params.arm_len = size / 2.0f;
+static inline float rpm_hover(const Params* p) {
+    // total thrust = m*g = 4 * k_thrust * rpm^2
+    return sqrtf((p->mass * p->gravity) / (4.0f * p->k_thrust));
+}
 
-    // m ~ x^3
-    float mass_scale = powf(drone->params.arm_len, 3.0f) / powf(BASE_ARM_LEN, 3.0f);
-    drone->params.mass = BASE_MASS * mass_scale * rndf(1.0f - dr, 1.0f + dr);
+static inline float rpm_min_for_centered_hover(const Params* p) {
+    // choose min_rpm so that action=0 -> (min+max)/2 == hover
+    float min_rpm = 2.0f * rpm_hover(p) - p->max_rpm;
+    if (min_rpm < 0.0f) min_rpm = 0.0f;
+    if (min_rpm > p->max_rpm) min_rpm = p->max_rpm;
+    return min_rpm;
+}
 
-    // I ~ mx^2
-    float base_Iscale = BASE_MASS * BASE_ARM_LEN * BASE_ARM_LEN;
-    float I_scale = drone->params.mass * powf(drone->params.arm_len, 2.0f) / base_Iscale;
-    drone->params.ixx = BASE_IXX * I_scale * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.iyy = BASE_IYY * I_scale * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.izz = BASE_IZZ * I_scale * rndf(1.0f - dr, 1.0f + dr);
-
-    // k_thrust ~ m/l
-    float k_thrust_scale = (drone->params.mass * drone->params.arm_len) / (BASE_MASS * BASE_ARM_LEN);
-    drone->params.k_thrust = BASE_K_THRUST * k_thrust_scale * rndf(1.0f - dr, 1.0f + dr);
-
-    // k_ang_damp ~ I
-    float base_avg_inertia = (BASE_IXX + BASE_IYY + BASE_IZZ) / 3.0f;
-    float avg_inertia = (drone->params.ixx + drone->params.iyy + drone->params.izz) / 3.0f;
-    float avg_inertia_scale = avg_inertia / base_avg_inertia;
-    drone->params.k_ang_damp = BASE_K_ANG_DAMP * avg_inertia_scale * rndf(1.0f - dr, 1.0f + dr);
-
-    // drag ~ x^2
-    float drag_scale = powf(drone->params.arm_len, 2.0f) / powf(BASE_ARM_LEN, 2.0f);
-    drone->params.k_drag = BASE_K_DRAG * drag_scale * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.b_drag = BASE_B_DRAG * drag_scale * rndf(1.0f - dr, 1.0f + dr);
-
-    // Small gravity randomization
+static inline void init_drone(Drone* drone, float dr) {
+    drone->params.arm_len = BASE_ARM_LEN * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.mass = BASE_MASS * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.ixx = BASE_IXX * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.iyy = BASE_IYY * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.izz = BASE_IZZ * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.k_thrust = BASE_K_THRUST * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.k_ang_damp = BASE_K_ANG_DAMP * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.k_drag = BASE_K_DRAG * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.b_drag = BASE_B_DRAG * rndf(1.0f - dr, 1.0f + dr);
     drone->params.gravity = BASE_GRAVITY * rndf(0.99f, 1.01f);
 
-    // RPM ~ 1/x
-    float rpm_scale = (BASE_ARM_LEN) / (drone->params.arm_len);
-    drone->params.max_rpm = BASE_MAX_RPM * rpm_scale * rndf(1.0f - dr, 1.0f + dr);
-
+    drone->params.max_rpm = BASE_MAX_RPM;
     drone->params.max_vel = BASE_MAX_VEL;
     drone->params.max_omega = BASE_MAX_OMEGA;
 
     drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.j_mot = BASE_J_MOT * I_scale * rndf(1.0f - dr, 1.0f + dr);
-    
-    for (int i = 0; i < 4; i++) {
-        drone->state.rpms[i] = 0.0f;
-    }
+
+    float hover = rpm_hover(&drone->params);
+    for (int i = 0; i < 4; i++) drone->state.rpms[i] = hover;
+
     drone->state.pos = (Vec3){0.0f, 0.0f, 0.0f};
     drone->prev_pos = drone->state.pos;
     drone->state.vel = (Vec3){0.0f, 0.0f, 0.0f};
@@ -315,14 +279,15 @@ void init_drone(Drone* drone, float size, float dr) {
     drone->state.quat = (Quat){1.0f, 0.0f, 0.0f, 0.0f};
 }
 
-void compute_derivatives(State* state, Params* params, float* actions, StateDerivative* derivatives) {
-    // first order rpm lag
+static inline void compute_derivatives(State* state, Params* params, float* actions, StateDerivative* derivatives) {
+    float min_rpm = rpm_min_for_centered_hover(params);
+
     float target_rpms[4];
     for (int i = 0; i < 4; i++) {
-        target_rpms[i] = (actions[i] + 1.0f) * 0.5f * params->max_rpm;
+        float u = (actions[i] + 1.0f) * 0.5f; // [0,1]
+        target_rpms[i] = min_rpm + u * (params->max_rpm - min_rpm);
     }
 
-    // rpm rates
     float rpm_dot[4];
     for (int i = 0; i < 4; i++) {
         rpm_dot[i] = (1.0f / params->k_mot) * (target_rpms[i] - state->rpms[i]);
@@ -331,11 +296,13 @@ void compute_derivatives(State* state, Params* params, float* actions, StateDeri
     // motor thrusts
     float T[4];
     for (int i = 0; i < 4; i++) {
-        T[i] = params->k_thrust * powf(state->rpms[i], 2.0f);
+        float rpm = state->rpms[i];
+        if (rpm < 0.0f) rpm = 0.0f;
+        T[i] = params->k_thrust * rpm * rpm;
     }
 
     // body frame net force
-    Vec3 F_prop_body = {0.0f, 0.0f, T[0] + T[1] + T[2] + T[3]};
+    Vec3 F_prop_body = (Vec3){0.0f, 0.0f, T[0] + T[1] + T[2] + T[3]};
 
     // body frame force -> world frame force
     Vec3 F_prop = quat_rotate(state->quat, F_prop_body);
@@ -346,19 +313,16 @@ void compute_derivatives(State* state, Params* params, float* actions, StateDeri
     F_aero.y = -params->b_drag * state->vel.y;
     F_aero.z = -params->b_drag * state->vel.z;
 
-    // velocity rates, a = F/m
+    // linear acceleration
     Vec3 v_dot;
     v_dot.x = (F_prop.x + F_aero.x) / params->mass;
     v_dot.y = (F_prop.y + F_aero.y) / params->mass;
     v_dot.z = ((F_prop.z + F_aero.z) / params->mass) - params->gravity;
 
     // quaternion rates
-    Quat omega_q = {0.0f, state->omega.x, state->omega.y, state->omega.z};
+    Quat omega_q = (Quat){0.0f, state->omega.x, state->omega.y, state->omega.z};
     Quat q_dot = quat_mul(state->quat, omega_q);
-    q_dot.w *= 0.5f;
-    q_dot.x *= 0.5f;
-    q_dot.y *= 0.5f;
-    q_dot.z *= 0.5f;
+    q_dot.w *= 0.5f; q_dot.x *= 0.5f; q_dot.y *= 0.5f; q_dot.z *= 0.5f;
 
     // body frame torques (plus copter)
     //Vec3 Tau_prop;
@@ -371,12 +335,9 @@ void compute_derivatives(State* state, Params* params, float* actions, StateDeri
     // https://www.bitcraze.io/documentation/hardware/crazyflie_2_1_brushless/crazyflie_2_1_brushless-datasheet.pdf
     float arm_factor = params->arm_len / sqrtf(2.0f);
     Vec3 Tau_prop;
-    Tau_prop.x = arm_factor * ((T[0] + T[1]) - (T[3] + T[2]));
-    Tau_prop.y = arm_factor * ((T[0] + T[3]) - (T[1] + T[2]));
+    Tau_prop.x = arm_factor * ((T[2] + T[3]) - (T[0] + T[1]));
+    Tau_prop.y = arm_factor * ((T[1] + T[2]) - (T[0] + T[3]));
     Tau_prop.z = params->k_drag * (-T[0] + T[1] - T[2] + T[3]);
-
-    // torque from chaging motor speeds
-    float Tau_mot_z = params->j_mot * (rpm_dot[0] - rpm_dot[1] + rpm_dot[2] - rpm_dot[3]);
 
     // torque from angular damping
     Vec3 Tau_aero;
@@ -394,7 +355,7 @@ void compute_derivatives(State* state, Params* params, float* actions, StateDeri
     Vec3 w_dot;
     w_dot.x = (Tau_prop.x + Tau_aero.x + Tau_iner.x) / params->ixx;
     w_dot.y = (Tau_prop.y + Tau_aero.y + Tau_iner.y) / params->iyy;
-    w_dot.z = (Tau_prop.z + Tau_aero.z + Tau_iner.z + Tau_mot_z) / params->izz;
+    w_dot.z = (Tau_prop.z + Tau_aero.z + Tau_iner.z) / params->izz;
 
     derivatives->vel = state->vel;
     derivatives->v_dot = v_dot;
@@ -405,7 +366,7 @@ void compute_derivatives(State* state, Params* params, float* actions, StateDeri
     }
 }
 
-void step(State* initial, StateDerivative* deriv, float dt, State* output) {
+static inline void step(State* initial, StateDerivative* deriv, float dt, State* output) {
     output->pos = add3(initial->pos, scalmul3(deriv->vel, dt));
     output->vel = add3(initial->vel, scalmul3(deriv->v_dot, dt));
     output->quat = add_quat(initial->quat, scalmul_quat(deriv->q_dot, dt));
@@ -416,7 +377,7 @@ void step(State* initial, StateDerivative* deriv, float dt, State* output) {
     quat_normalize(&output->quat);
 }
 
-void rk4_step(State* state, Params* params, float* actions, float dt) {
+static inline void rk4_step(State* state, Params* params, float* actions, float dt) {
     StateDerivative k1, k2, k3, k4;
     State temp_state;
 
@@ -457,39 +418,39 @@ void rk4_step(State* state, Params* params, float* actions, float dt) {
     quat_normalize(&state->quat);
 }
 
-void move_drone(Drone* drone, float* actions) {
-    // clamp actions
+static inline void move_drone(Drone* drone, float* actions) {
     clamp4(actions, -1.0f, 1.0f);
 
-    // Domain randomized dt
-    float dt = DT * rndf(1.0f - DT_RNG, 1.0 + DT_RNG);
+    for (int s = 0; s < ACTION_SUBSTEPS; s++) {
+        float dt = DT * rndf(1.0f - DT_RNG, 1.0f + DT_RNG);
 
-    // update drone state
-    drone->prev_pos = drone->state.pos;
-    rk4_step(&drone->state, &drone->params, actions, dt);
+        drone->prev_pos = drone->state.pos;
+        rk4_step(&drone->state, &drone->params, actions, dt);
 
-    // clamp and normalise for observations
-    clamp3(&drone->state.vel, -drone->params.max_vel, drone->params.max_vel);
-    clamp3(&drone->state.omega, -drone->params.max_omega, drone->params.max_omega);
+        clamp3(&drone->state.vel,   -drone->params.max_vel,   drone->params.max_vel);
+        clamp3(&drone->state.omega, -drone->params.max_omega, drone->params.max_omega);
+
+        for (int i = 0; i < 4; i++) {
+            drone->state.rpms[i] = clampf(drone->state.rpms[i], 0.0f, drone->params.max_rpm);
+        }
+    }
 }
 
-void reset_rings(Target* ring_buffer, int num_rings) {
+static inline void reset_rings(Target* ring_buffer, int num_rings) {
     ring_buffer[0] = rndring(RING_RADIUS);
     
     // ensure rings are spaced at least 2*ring_radius apart
     for (int i = 1; i < num_rings; i++) {
         do {
             ring_buffer[i] = rndring(RING_RADIUS);
-        }  while (norm3(sub3(ring_buffer[i].pos, ring_buffer[i - 1].pos)) < 2.0f * RING_RADIUS);
+        } while (norm3(sub3(ring_buffer[i].pos, ring_buffer[i - 1].pos)) < 2.0f * RING_RADIUS);
     }
 }
 
-int check_ring(Drone* drone, Target* ring) {
+static inline int check_ring(Drone* drone, Target* ring) {
     // previous dot product negative if on the 'entry' side of the ring's plane
     float prev_dot = dot3(sub3(drone->prev_pos, ring->pos), ring->normal);
-
-    // new dot product positive if on the 'exit' side of the ring's plane
-    float new_dot = dot3(sub3(drone->state.pos, ring->pos), ring->normal);
+    float new_dot  = dot3(sub3(drone->state.pos, ring->pos), ring->normal);
 
     bool valid_dir = (prev_dot < 0.0f && new_dot > 0.0f);
     bool invalid_dir = (prev_dot > 0.0f && new_dot < 0.0f);
@@ -498,15 +459,16 @@ int check_ring(Drone* drone, Target* ring) {
     if (valid_dir || invalid_dir) {
         // find intesection with ring's plane
         Vec3 dir = sub3(drone->state.pos, drone->prev_pos);
-        float t = -prev_dot / dot3(ring->normal, dir); // possible nan
+        float denom = dot3(ring->normal, dir);
+        if (fabsf(denom) < 1e-9f) return 0;
 
+        float t = -prev_dot / denom;
         Vec3 intersection = add3(drone->prev_pos, scalmul3(dir, t));
         float dist = norm3(sub3(intersection, ring->pos));
 
-        // reward or terminate based on distance to ring center
-        if (dist < (ring->radius - 0.5) && valid_dir) {
+        if (dist < (ring->radius - 0.5f) && valid_dir) {
             return 1;
-        } else if (dist < ring->radius + 0.5) {
+        } else if (dist < ring->radius + 0.5f) {
             return -1;
         }
     }
@@ -514,7 +476,7 @@ int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-Drone *nearest_drone(Drone *agent, Drone *others, int num_agents) {
+static inline Drone *nearest_drone(Drone *agent, Drone *others, int num_agents) {
   float min_dist = FLT_MAX;
   Drone *nearest = NULL;
 
@@ -533,7 +495,7 @@ Drone *nearest_drone(Drone *agent, Drone *others, int num_agents) {
   return nearest;
 }
 
-bool check_collision(Drone *agent, Drone *others, int num_agents) {
+static inline bool check_collision(Drone *agent, Drone *others, int num_agents) {
   if (num_agents <= 1) return false;
 
   Drone *nearest = nearest_drone(agent, others, num_agents);

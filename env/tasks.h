@@ -136,7 +136,7 @@ void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
 float static_task_reward(Drone *agent, bool collision) {
   Vec3 to_target = sub3(agent->state.pos, agent->target->pos);
   float dist = norm3(to_target);
-  float dist_reward = expf(-2.0f * dist);
+  float dist_reward = expf(-0.1f * dist);
 
   float density_reward = collision ? -1.0f : 0.0f;
   float reward = dist_reward + density_reward;

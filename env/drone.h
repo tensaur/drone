@@ -78,7 +78,8 @@ void compute_observations(DroneEnv *env) {
 
     Quat q_inv = quat_inverse(agent->state.quat);
     Vec3 linear_vel_body = quat_rotate(q_inv, agent->state.vel);
-    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
+    Vec3 to_target_world = sub3(agent->target->pos, agent->state.pos);
+    Vec3 to_target = quat_rotate(q_inv, to_target_world);
 
     env->observations[idx++] = linear_vel_body.x / agent->params.max_vel;
     env->observations[idx++] = linear_vel_body.y / agent->params.max_vel;
@@ -106,19 +107,18 @@ void compute_observations(DroneEnv *env) {
     env->observations[idx++] = clampf(to_target.y, -1.0f, 1.0f);
     env->observations[idx++] = clampf(to_target.z, -1.0f, 1.0f);
 
-    env->observations[idx++] = agent->target->normal.x;
-    env->observations[idx++] = agent->target->normal.y;
-    env->observations[idx++] = agent->target->normal.z;
+    Vec3 normal_body = quat_rotate(q_inv, agent->target->normal);
+    env->observations[idx++] = normal_body.x;
+    env->observations[idx++] = normal_body.y;
+    env->observations[idx++] = normal_body.z;
 
-    // Multiagent obs
     Drone *nearest = nearest_drone(agent, env->agents, env->num_agents);
     if (env->num_agents > 1) {
-      env->observations[idx++] =
-          clampf(nearest->state.pos.x - agent->state.pos.x, -1.0f, 1.0f);
-      env->observations[idx++] =
-          clampf(nearest->state.pos.y - agent->state.pos.y, -1.0f, 1.0f);
-      env->observations[idx++] =
-          clampf(nearest->state.pos.z - agent->state.pos.z, -1.0f, 1.0f);
+      Vec3 to_nearest_world = sub3(nearest->state.pos, agent->state.pos);
+      Vec3 to_nearest = quat_rotate(q_inv, to_nearest_world);
+      env->observations[idx++] = clampf(to_nearest.x, -1.0f, 1.0f);
+      env->observations[idx++] = clampf(to_nearest.y, -1.0f, 1.0f);
+      env->observations[idx++] = clampf(to_nearest.z, -1.0f, 1.0f);
     } else {
       env->observations[idx++] = MAX_DIST;
       env->observations[idx++] = MAX_DIST;
@@ -138,8 +138,7 @@ void reset_agent(DroneEnv *env, Drone *agent, int idx) {
   agent->buffer_size = env->max_rings;
   agent->buffer_idx = -1;
 
-  float size = rndf(0.1f, 0.4f);
-  init_drone(agent, size, 0.1f);
+  init_drone(agent, 0.05f);
 
   agent->state.pos =
       (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y),
@@ -161,11 +160,11 @@ void c_reset(DroneEnv *env) {
   env->tick = 0;
   int rng = rand();
 
-  if (rng > INT_MAX / 2) {
-    env->task = RACE;
-  } else {
-    env->task = (DroneTask)(rng % (TASK_N - 1));
-  }
+  //if (rng > INT_MAX / 2) {
+  //  env->task = RACE;
+  //} else {
+  env->task = (DroneTask)(rng % (TASK_N - 1));
+  //}
 
   if (env->task == RACE) {
     reset_rings(env->ring_buffer, env->max_rings);
