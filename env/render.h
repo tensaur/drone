@@ -22,7 +22,7 @@ Color COLORS[64] = {W, B, B, R, R, B, B, W, B, W, B, R, R, B, W, B, B, B, W, R, 
 #undef B
 
 // 3D model config
-#define MODEL_SCALE 10.0f
+#define MODEL_SCALE 5.0f
 #define NUM_PROPELLERS 4
 static const int PROP_MESH_IDX[NUM_PROPELLERS] = {5, 6, 7, 8};
 static const float PROP_DIRS[NUM_PROPELLERS] = {1.0f, -1.0f, 1.0f, -1.0f};
@@ -287,7 +287,7 @@ Client* make_client(DroneEnv* env) {
 const Color PUFF_RED = (Color){187, 0, 0, 255};
 const Color PUFF_CYAN = (Color){0, 187, 187, 255};
 const Color PUFF_WHITE = (Color){241, 241, 241, 241};
-const Color PUFF_BACKGROUND = (Color){59, 59, 59, 255};
+const Color PUFF_BACKGROUND = (Color){6, 24, 24, 255};
 const Color PUFF_GREEN = (Color){0, 220, 80, 255};
 
 void DrawRing3D(Target ring, float thickness, Color entryColor, Color exitColor) {
@@ -334,9 +334,11 @@ void DrawDroneModel(Client* client, Drone* agent, int drone_idx, float dt, Color
     for (int m = 0; m < model->meshCount; m++) {
         Matrix meshWorld = droneWorld;
 
-        // Check if this mesh is a propeller - if so, apply spin around center
+        // Check if this mesh is a propeller
+        bool is_prop = false;
         for (int p = 0; p < NUM_PROPELLERS; p++) {
             if (m == PROP_MESH_IDX[p]) {
+                is_prop = true;
                 Vec3 c = client->prop_centers[p];
                 Matrix toOrigin = MatrixTranslate(-c.x, -c.y, -c.z);
                 Matrix spin = MatrixRotateZ(angles[p]);
@@ -349,10 +351,14 @@ void DrawDroneModel(Client* client, Drone* agent, int drone_idx, float dt, Color
 
         Material mat = model->materials[model->meshMaterial[m]];
 
-        // Tint white materials with body_color, dark materials stay black
         Color origColor = mat.maps[MATERIAL_MAP_DIFFUSE].color;
         int brightness = (origColor.r + origColor.g + origColor.b) / 3;
-        mat.maps[MATERIAL_MAP_DIFFUSE].color = (brightness > 64) ? body_color : origColor;
+
+        if (is_prop || brightness > 64) {
+            mat.maps[MATERIAL_MAP_DIFFUSE].color = body_color;
+        } else {
+            mat.maps[MATERIAL_MAP_DIFFUSE].color = origColor;
+        }
 
         DrawMesh(model->meshes[m], mat, meshWorld);
     }
