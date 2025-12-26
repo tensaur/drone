@@ -35,19 +35,19 @@ double randn(double mean, double std) {
 typedef struct LinearContLSTM LinearContLSTM;
 struct LinearContLSTM {
     int num_agents;
-    float *obs;
-    float *log_std;
-    Linear *encoder;
-    GELU *gelu1;
-    LSTM *lstm;
-    Linear *actor;
-    Linear *value_fn;
+    float* obs;
+    float* log_std;
+    Linear* encoder;
+    GELU* gelu1;
+    LSTM* lstm;
+    Linear* actor;
+    Linear* value_fn;
     int num_actions;
 };
 
-LinearContLSTM *make_linearcontlstm(Weights *weights, int num_agents, int input_dim,
+LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_dim,
                                     int logit_sizes[], int num_actions) {
-    LinearContLSTM *net = calloc(1, sizeof(LinearContLSTM));
+    LinearContLSTM* net = calloc(1, sizeof(LinearContLSTM));
     net->num_agents = num_agents;
     net->obs = calloc(num_agents * input_dim, sizeof(float));
     net->num_actions = logit_sizes[0];
@@ -65,7 +65,7 @@ LinearContLSTM *make_linearcontlstm(Weights *weights, int num_agents, int input_
     return net;
 }
 
-void free_linearcontlstm(LinearContLSTM *net) {
+void free_linearcontlstm(LinearContLSTM* net) {
     free(net->obs);
     free(net->encoder);
     free(net->gelu1);
@@ -75,7 +75,7 @@ void free_linearcontlstm(LinearContLSTM *net) {
     free(net);
 }
 
-void forward_linearcontlstm(LinearContLSTM *net, float *observations, float *actions) {
+void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions) {
     linear(net->encoder, observations);
     gelu(net->gelu1, net->encoder->output);
     lstm(net->lstm, net->gelu1->output);
@@ -88,7 +88,7 @@ void forward_linearcontlstm(LinearContLSTM *net, float *observations, float *act
     }
 }
 
-void generate_dummy_actions(DroneEnv *env) {
+void generate_dummy_actions(DroneEnv* env) {
     // Generate random floats in [-1, 1] range
     env->actions[0] = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
     env->actions[1] = ((float)rand() / (float)RAND_MAX) * 2.0f - 1.0f;
@@ -98,15 +98,15 @@ void generate_dummy_actions(DroneEnv *env) {
 
 #ifdef __EMSCRIPTEN__
 typedef struct {
-    DroneEnv *env;
-    LinearContLSTM *net;
-    Weights *weights;
+    DroneEnv* env;
+    LinearContLSTM* net;
+    Weights* weights;
 } WebRenderArgs;
 
-void emscriptenStep(void *e) {
-    WebRenderArgs *args = (WebRenderArgs *)e;
-    DroneEnv *env = args->env;
-    LinearContLSTM *net = args->net;
+void emscriptenStep(void* e) {
+    WebRenderArgs* args = (WebRenderArgs*)e;
+    DroneEnv* env = args->env;
+    LinearContLSTM* net = args->net;
 
     forward_linearcontlstm(net, env->observations, env->actions);
     c_step(env);
@@ -114,13 +114,13 @@ void emscriptenStep(void *e) {
     return;
 }
 
-WebRenderArgs *web_args = NULL;
+WebRenderArgs* web_args = NULL;
 #endif
 
 int main() {
     srand(time(NULL)); // Seed random number generator
 
-    DroneEnv *env = calloc(1, sizeof(DroneEnv));
+    DroneEnv* env = calloc(1, sizeof(DroneEnv));
     env->num_agents = 64;
     env->max_rings = 10;
     env->task = ORBIT;
@@ -128,14 +128,15 @@ int main() {
 
     size_t obs_size = 26;
     size_t act_size = 4;
-    env->observations = (float *)calloc(env->num_agents * obs_size, sizeof(float));
-    env->actions = (float *)calloc(env->num_agents * act_size, sizeof(float));
-    env->rewards = (float *)calloc(env->num_agents, sizeof(float));
-    env->terminals = (unsigned char *)calloc(env->num_agents, sizeof(float));
+    env->observations = (float*)calloc(env->num_agents * obs_size, sizeof(float));
+    env->actions = (float*)calloc(env->num_agents * act_size, sizeof(float));
+    env->rewards = (float*)calloc(env->num_agents, sizeof(float));
+    env->terminals = (unsigned char*)calloc(env->num_agents, sizeof(float));
 
-    //Weights *weights = load_weights("resources/drone/drone_weights.bin", 136073);
-    //int logit_sizes[1] = {4};
-    //LinearContLSTM *net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
+    // Weights *weights = load_weights("resources/drone/drone_weights.bin", 136073);
+    // int logit_sizes[1] = {4};
+    // LinearContLSTM *net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes,
+    // 1);
 
     if (!env->observations || !env->actions || !env->rewards) {
         fprintf(stderr, "ERROR: Failed to allocate memory for demo buffers.\n");
@@ -151,7 +152,7 @@ int main() {
     c_reset(env);
 
 #ifdef __EMSCRIPTEN__
-    WebRenderArgs *args = calloc(1, sizeof(WebRenderArgs));
+    WebRenderArgs* args = calloc(1, sizeof(WebRenderArgs));
     args->env = env;
     args->net = net;
     args->weights = weights;
@@ -162,13 +163,13 @@ int main() {
     c_render(env);
 
     while (!WindowShouldClose()) {
-        //forward_linearcontlstm(net, env->observations, env->actions);
+        // forward_linearcontlstm(net, env->observations, env->actions);
         c_step(env);
         c_render(env);
     }
 
     c_close(env);
-    //free_linearcontlstm(net);
+    // free_linearcontlstm(net);
     free(env->observations);
     free(env->actions);
     free(env->rewards);

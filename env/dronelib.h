@@ -16,21 +16,21 @@
 
 // Crazyflie Physical Constants
 // https://github.com/arplaboratory/learning-to-fly
-#define BASE_MASS 0.027f            // kg
-#define BASE_IXX 3.85e-6f           // kgm²
-#define BASE_IYY 3.85e-6f           // kgm²
-#define BASE_IZZ 5.9675e-6f         // kgm²
-#define BASE_ARM_LEN 0.0396f        // m
-#define BASE_K_THRUST 3.16e-10f     // thrust coefficient
-#define BASE_K_DRAG 0.005964552f    // yaw moment constant
-#define BASE_GRAVITY 9.81f          // m/s^2
-#define BASE_MAX_RPM 21702.0f       // RPM
-#define BASE_K_MOT 0.15f            // s (RPM time constant)
+#define BASE_MASS 0.027f         // kg
+#define BASE_IXX 3.85e-6f        // kgm²
+#define BASE_IYY 3.85e-6f        // kgm²
+#define BASE_IZZ 5.9675e-6f      // kgm²
+#define BASE_ARM_LEN 0.0396f     // m
+#define BASE_K_THRUST 3.16e-10f  // thrust coefficient
+#define BASE_K_DRAG 0.005964552f // yaw moment constant
+#define BASE_GRAVITY 9.81f       // m/s^2
+#define BASE_MAX_RPM 21702.0f    // RPM
+#define BASE_K_MOT 0.15f         // s (RPM time constant)
 
-#define BASE_K_ANG_DAMP 0.0f        // angular damping coefficient
-#define BASE_B_DRAG 0.0f            // linear drag coefficient
-#define BASE_MAX_VEL 20.0f          // m/s
-#define BASE_MAX_OMEGA 20.0f        // rad/s
+#define BASE_K_ANG_DAMP 0.0f // angular damping coefficient
+#define BASE_B_DRAG 0.0f     // linear drag coefficient
+#define BASE_MAX_VEL 20.0f   // m/s
+#define BASE_MAX_OMEGA 20.0f // rad/s
 
 // Simulation properties
 #define GRID_X 30.0f
@@ -51,7 +51,8 @@
 #define DT_RNG 0.0f
 
 // Corner to corner distance
-#define MAX_DIST sqrtf((2*GRID_X)*(2*GRID_X) + (2*GRID_Y)*(2*GRID_Y) + (2*GRID_Z)*(2*GRID_Z))
+#define MAX_DIST                                                                                   \
+    sqrtf((2 * GRID_X) * (2 * GRID_X) + (2 * GRID_Y) * (2 * GRID_Y) + (2 * GRID_Z) * (2 * GRID_Z))
 
 typedef struct Log Log;
 struct Log {
@@ -158,13 +159,17 @@ static inline Vec3 add3(Vec3 a, Vec3 b) { return (Vec3){a.x + b.x, a.y + b.y, a.
 static inline Vec3 sub3(Vec3 a, Vec3 b) { return (Vec3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 static inline Vec3 scalmul3(Vec3 a, float b) { return (Vec3){a.x * b, a.y * b, a.z * b}; }
 
-static inline Quat add_quat(Quat a, Quat b) { return (Quat){a.w + b.w, a.x + b.x, a.y + b.y, a.z + b.z}; }
-static inline Quat scalmul_quat(Quat a, float b) { return (Quat){a.w * b, a.x * b, a.y * b, a.z * b}; }
+static inline Quat add_quat(Quat a, Quat b) {
+    return (Quat){a.w + b.w, a.x + b.x, a.y + b.y, a.z + b.z};
+}
+static inline Quat scalmul_quat(Quat a, float b) {
+    return (Quat){a.w * b, a.x * b, a.y * b, a.z * b};
+}
 
 static inline float dot3(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 static inline float norm3(Vec3 a) { return sqrtf(dot3(a, a)); }
 
-static inline void clamp3(Vec3 *vec, float min, float max) {
+static inline void clamp3(Vec3* vec, float min, float max) {
     vec->x = clampf(vec->x, min, max);
     vec->y = clampf(vec->y, min, max);
     vec->z = clampf(vec->z, min, max);
@@ -186,10 +191,13 @@ static inline Quat quat_mul(Quat q1, Quat q2) {
     return out;
 }
 
-static inline void quat_normalize(Quat *q) {
-    float n = sqrtf(q->w*q->w + q->x*q->x + q->y*q->y + q->z*q->z);
+static inline void quat_normalize(Quat* q) {
+    float n = sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
     if (n > 0.0f) {
-        q->w /= n; q->x /= n; q->y /= n; q->z /= n;
+        q->w /= n;
+        q->x /= n;
+        q->y /= n;
+        q->z /= n;
     }
 }
 
@@ -223,17 +231,17 @@ static inline Quat rndquat(void) {
 }
 
 static inline Quat quat_from_axis_angle(Vec3 axis, float angle) {
-  float half = angle * 0.5f;
-  float s = sinf(half);
-  return (Quat){cosf(half), axis.x * s, axis.y * s, axis.z * s};
+    float half = angle * 0.5f;
+    float s = sinf(half);
+    return (Quat){cosf(half), axis.x * s, axis.y * s, axis.z * s};
 }
 
 static inline Target rndring(float radius) {
     Target ring = (Target){0};
 
-    ring.pos.x = rndf(-GRID_X + 2*radius, GRID_X - 2*radius);
-    ring.pos.y = rndf(-GRID_Y + 2*radius, GRID_Y - 2*radius);
-    ring.pos.z = rndf(-GRID_Z + 2*radius, GRID_Z - 2*radius);
+    ring.pos.x = rndf(-GRID_X + 2 * radius, GRID_X - 2 * radius);
+    ring.pos.y = rndf(-GRID_Y + 2 * radius, GRID_Y - 2 * radius);
+    ring.pos.z = rndf(-GRID_Z + 2 * radius, GRID_Z - 2 * radius);
 
     ring.orientation = rndquat();
 
@@ -276,7 +284,8 @@ static inline void init_drone(Drone* drone, float dr) {
     drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr);
 
     float hover = rpm_hover(&drone->params);
-    for (int i = 0; i < 4; i++) drone->state.rpms[i] = hover;
+    for (int i = 0; i < 4; i++)
+        drone->state.rpms[i] = hover;
 
     drone->state.pos = (Vec3){0.0f, 0.0f, 0.0f};
     drone->prev_pos = drone->state.pos;
@@ -285,7 +294,8 @@ static inline void init_drone(Drone* drone, float dr) {
     drone->state.quat = (Quat){1.0f, 0.0f, 0.0f, 0.0f};
 }
 
-static inline void compute_derivatives(State* state, Params* params, float* actions, StateDerivative* derivatives) {
+static inline void compute_derivatives(State* state, Params* params, float* actions,
+                                       StateDerivative* derivatives) {
     float min_rpm = rpm_min_for_centered_hover(params);
 
     float target_rpms[4];
@@ -328,13 +338,16 @@ static inline void compute_derivatives(State* state, Params* params, float* acti
     // quaternion rates
     Quat omega_q = (Quat){0.0f, state->omega.x, state->omega.y, state->omega.z};
     Quat q_dot = quat_mul(state->quat, omega_q);
-    q_dot.w *= 0.5f; q_dot.x *= 0.5f; q_dot.y *= 0.5f; q_dot.z *= 0.5f;
+    q_dot.w *= 0.5f;
+    q_dot.x *= 0.5f;
+    q_dot.y *= 0.5f;
+    q_dot.z *= 0.5f;
 
     // body frame torques (plus copter)
-    //Vec3 Tau_prop;
-    //Tau_prop.x = params->arm_len*(T[1] - T[3]);
-    //Tau_prop.y = params->arm_len*(T[2] - T[0]);
-    //Tau_prop.z = params->k_drag*(T[0] - T[1] + T[2] - T[3]);
+    // Vec3 Tau_prop;
+    // Tau_prop.x = params->arm_len*(T[1] - T[3]);
+    // Tau_prop.y = params->arm_len*(T[2] - T[0]);
+    // Tau_prop.z = params->k_drag*(T[0] - T[1] + T[2] - T[3]);
 
     // body frame torques (cross copter)
     // M1=FR, M2=BR, M3=BL, M4=FL
@@ -350,7 +363,7 @@ static inline void compute_derivatives(State* state, Params* params, float* acti
     Tau_aero.x = -params->k_ang_damp * state->omega.x;
     Tau_aero.y = -params->k_ang_damp * state->omega.y;
     Tau_aero.z = -params->k_ang_damp * state->omega.z;
-    
+
     // gyroscopic torque
     Vec3 Tau_iner;
     Tau_iner.x = (params->iyy - params->izz) * state->omega.y * state->omega.z;
@@ -418,7 +431,8 @@ static inline void rk4_step(State* state, Params* params, float* actions, float 
     state->omega.z += (k1.w_dot.z + 2.0f * k2.w_dot.z + 2.0f * k3.w_dot.z + k4.w_dot.z) * dt_6;
 
     for (int i = 0; i < 4; i++) {
-        state->rpms[i] += (k1.rpm_dot[i] + 2.0f * k2.rpm_dot[i] + 2.0f * k3.rpm_dot[i] + k4.rpm_dot[i]) * dt_6;
+        state->rpms[i] +=
+            (k1.rpm_dot[i] + 2.0f * k2.rpm_dot[i] + 2.0f * k3.rpm_dot[i] + k4.rpm_dot[i]) * dt_6;
     }
 
     quat_normalize(&state->quat);
@@ -433,7 +447,7 @@ static inline void move_drone(Drone* drone, float* actions) {
         drone->prev_pos = drone->state.pos;
         rk4_step(&drone->state, &drone->params, actions, dt);
 
-        clamp3(&drone->state.vel,   -drone->params.max_vel,   drone->params.max_vel);
+        clamp3(&drone->state.vel, -drone->params.max_vel, drone->params.max_vel);
         clamp3(&drone->state.omega, -drone->params.max_omega, drone->params.max_omega);
 
         for (int i = 0; i < 4; i++) {
@@ -444,7 +458,7 @@ static inline void move_drone(Drone* drone, float* actions) {
 
 static inline void reset_rings(Target* ring_buffer, int num_rings) {
     ring_buffer[0] = rndring(RING_RADIUS);
-    
+
     // ensure rings are spaced at least 2*ring_radius apart
     for (int i = 1; i < num_rings; i++) {
         do {
@@ -456,7 +470,7 @@ static inline void reset_rings(Target* ring_buffer, int num_rings) {
 static inline int check_ring(Drone* drone, Target* ring) {
     // previous dot product negative if on the 'entry' side of the ring's plane
     float prev_dot = dot3(sub3(drone->prev_pos, ring->pos), ring->normal);
-    float new_dot  = dot3(sub3(drone->state.pos, ring->pos), ring->normal);
+    float new_dot = dot3(sub3(drone->state.pos, ring->pos), ring->normal);
 
     bool valid_dir = (prev_dot < 0.0f && new_dot > 0.0f);
     bool invalid_dir = (prev_dot > 0.0f && new_dot < 0.0f);
@@ -482,32 +496,31 @@ static inline int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-static inline Drone *nearest_drone(Drone *agent, Drone *others, int num_agents) {
-  float min_dist = FLT_MAX;
-  Drone *nearest = NULL;
+static inline Drone* nearest_drone(Drone* agent, Drone* others, int num_agents) {
+    float min_dist = FLT_MAX;
+    Drone* nearest = NULL;
 
-  for (int i = 0; i < num_agents; i++) {
-    Drone *other = &others[i];
-    if (other == agent) continue;
+    for (int i = 0; i < num_agents; i++) {
+        Drone* other = &others[i];
+        if (other == agent) continue;
 
-    float dist = norm3(sub3(agent->state.pos, other->state.pos));
+        float dist = norm3(sub3(agent->state.pos, other->state.pos));
 
-    if (dist < min_dist) {
-      min_dist = dist;
-      nearest = other;
+        if (dist < min_dist) {
+            min_dist = dist;
+            nearest = other;
+        }
     }
-  }
 
-  return nearest;
+    return nearest;
 }
 
-static inline bool check_collision(Drone *agent, Drone *others, int num_agents) {
-  if (num_agents <= 1) return false;
+static inline bool check_collision(Drone* agent, Drone* others, int num_agents) {
+    if (num_agents <= 1) return false;
 
-  Drone *nearest = nearest_drone(agent, others, num_agents);
-  Vec3 to_nearest = sub3(agent->state.pos, nearest->state.pos);
-  float nearest_dist = norm3(to_nearest);
+    Drone* nearest = nearest_drone(agent, others, num_agents);
+    Vec3 to_nearest = sub3(agent->state.pos, nearest->state.pos);
+    float nearest_dist = norm3(to_nearest);
 
-  return nearest_dist < 0.1f;
+    return nearest_dist < 0.1f;
 }
-

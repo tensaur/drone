@@ -1,10 +1,10 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 // Convert filename to valid C identifier
-void sanitize_name(char *output, const char *input) {
+void sanitize_name(char* output, const char* input) {
     int i = 0;
     while (*input) {
         if (isalnum(*input)) {
@@ -17,18 +17,18 @@ void sanitize_name(char *output, const char *input) {
     output[i] = '\0';
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <input.bin> <output.h>\n", argv[0]);
         fprintf(stderr, "Example: %s weights.bin weights.h\n", argv[0]);
         return 1;
     }
 
-    const char *input_file = argv[1];
-    const char *output_file = argv[2];
+    const char* input_file = argv[1];
+    const char* output_file = argv[2];
 
     // Open input binary file
-    FILE *in = fopen(input_file, "rb");
+    FILE* in = fopen(input_file, "rb");
     if (!in) {
         fprintf(stderr, "Error: Cannot open input file '%s'\n", input_file);
         return 1;
@@ -42,13 +42,14 @@ int main(int argc, char *argv[]) {
     // Calculate number of floats
     size_t num_floats = file_size / sizeof(float);
     if (file_size % sizeof(float) != 0) {
-        fprintf(stderr, "Warning: File size (%ld bytes) is not a multiple of sizeof(float) (%zu bytes)\n",
+        fprintf(stderr,
+                "Warning: File size (%ld bytes) is not a multiple of sizeof(float) (%zu bytes)\n",
                 file_size, sizeof(float));
         fprintf(stderr, "Reading %zu complete floats\n", num_floats);
     }
 
     // Read all floats
-    float *weights = (float *)malloc(num_floats * sizeof(float));
+    float* weights = (float*)malloc(num_floats * sizeof(float));
     if (!weights) {
         fprintf(stderr, "Error: Failed to allocate memory for %zu floats\n", num_floats);
         fclose(in);
@@ -65,7 +66,7 @@ int main(int argc, char *argv[]) {
     fclose(in);
 
     // Open output header file
-    FILE *out = fopen(output_file, "w");
+    FILE* out = fopen(output_file, "w");
     if (!out) {
         fprintf(stderr, "Error: Cannot create output file '%s'\n", output_file);
         free(weights);
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
 
     // Create sanitized array name from input filename
     char array_name[256];
-    const char *base_name = strrchr(input_file, '/');
+    const char* base_name = strrchr(input_file, '/');
     base_name = base_name ? base_name + 1 : input_file;
     sanitize_name(array_name, base_name);
 
