@@ -30,9 +30,18 @@ uv sync --quiet
 echo -e "${GREEN}OK!${NC}"
 
 echo -n "Linking dev drone env to overwrite demo version in submodule... "
+# overwrite env source code
 rm -rf ./pufferlib/pufferlib/ocean/drone
 ln -s "$(pwd)/env" ./pufferlib/pufferlib/ocean/drone
+
+# overwrite resources
+rm -rf ./pufferlib/pufferlib/resources/drone
+ln -s "$(pwd)/resources" ./pufferlib/pufferlib/resources/drone
+
+# overwrite hypers config
 ln -sf "$(pwd)/config/drone.ini" ./pufferlib/pufferlib/config/ocean/drone.ini
+
+# copy latest env binding to drone project root
 ln -sf ./pufferlib/pufferlib/ocean/env_binding.h ./env_binding.h
 echo -e "${GREEN}OK!${NC}"
 

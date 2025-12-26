@@ -222,6 +222,12 @@ static inline Quat rndquat(void) {
     return q;
 }
 
+static inline Quat quat_from_axis_angle(Vec3 axis, float angle) {
+  float half = angle * 0.5f;
+  float s = sinf(half);
+  return (Quat){cosf(half), axis.x * s, axis.y * s, axis.z * s};
+}
+
 static inline Target rndring(float radius) {
     Target ring = (Target){0};
 

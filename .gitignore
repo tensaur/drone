@@ -3,9 +3,7 @@
 *.cmd
 
 # puffer
-resources
 experiments/
-*.bin
 env_binding.h
 
 venv/
