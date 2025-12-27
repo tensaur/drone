@@ -44,6 +44,7 @@ struct Client {
 
     int selected_drone;
     bool inspect_mode;
+    bool follow_mode;
     int target_fps;
 
     // Drone 3D model
@@ -88,7 +89,7 @@ void c_close_client(Client* client) {
     free(client);
 }
 
-static void update_camera_position(Client* c) {
+static void update_camera_position(Client* c, Vec3 target_pos) {
     float r = c->camera_distance;
     float az = c->camera_azimuth;
     float el = c->camera_elevation;
@@ -97,11 +98,16 @@ static void update_camera_position(Client* c) {
     float y = r * cosf(el) * sinf(az);
     float z = r * sinf(el);
 
-    c->camera.position = (Vector3){x, y, z};
-    c->camera.target = (Vector3){0, 0, 0};
+    if (c->follow_mode) {
+        c->camera.target = (Vector3){target_pos.x, target_pos.y, target_pos.z};
+        c->camera.position = (Vector3){target_pos.x + x, target_pos.y + y, target_pos.z + z};
+    } else {
+        c->camera.target = (Vector3){0, 0, 0};
+        c->camera.position = (Vector3){x, y, z};
+    }
 }
 
-void handle_camera_controls(Client* client) {
+void handle_camera_controls(Client* client, Vec3 target_pos) {
     Vector2 mouse_pos = GetMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -127,14 +133,14 @@ void handle_camera_controls(Client* client) {
 
         client->last_mouse_pos = mouse_pos;
 
-        update_camera_position(client);
+        update_camera_position(client, target_pos);
     }
 
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
         client->camera_distance -= wheel * 2.0f;
         client->camera_distance = clampf(client->camera_distance, 5.0f, 100.0f);
-        update_camera_position(client);
+        update_camera_position(client, target_pos);
     }
 }
 
@@ -233,7 +239,8 @@ Client* make_client(DroneEnv* env) {
     client->camera.fovy = 45.0f;
     client->camera.projection = CAMERA_PERSPECTIVE;
 
-    update_camera_position(client);
+    Vec3 origin = {0, 0, 0};
+    update_camera_position(client, origin);
 
     // Initialize trail buffer
     client->trails = (Trail*)calloc(env->num_agents, sizeof(Trail));
@@ -248,6 +255,7 @@ Client* make_client(DroneEnv* env) {
 
     client->selected_drone = 0;
     client->inspect_mode = false;
+    client->follow_mode = false;
     client->target_fps = 60;
     client->model_loaded = false;
 
@@ -421,10 +429,13 @@ void c_render(DroneEnv* env) {
         }
     }
 
-    handle_camera_controls(env->client);
-
     Client* client = env->client;
     float dt = GetFrameTime();
+
+    // Get selected drone position for camera
+    Vec3 drone_pos = env->agents[client->selected_drone].state.pos;
+
+    handle_camera_controls(client, drone_pos);
     handle_drone_selection(client, env->num_agents, dt);
     handle_fps_control(client, dt);
 
@@ -434,6 +445,15 @@ void c_render(DroneEnv* env) {
 
     if (IsKeyPressed(KEY_M) && client->model_loaded) {
         client->use_3d_model = !client->use_3d_model;
+    }
+
+    if (IsKeyPressed(KEY_F)) {
+        client->follow_mode = !client->follow_mode;
+    }
+
+    // Update camera position every frame when in follow mode
+    if (client->follow_mode) {
+        update_camera_position(client, drone_pos);
     }
 
     bool inspect_mode = client->inspect_mode;
@@ -537,6 +557,9 @@ void c_render(DroneEnv* env) {
         DrawText(TextFormat("Render: %s (M)", client->use_3d_model ? "3D Model" : "Primitive"), 10,
                  y, 18, client->use_3d_model ? PUFF_GREEN : LIGHTGRAY);
     }
+    y += 22;
+    DrawText(TextFormat("Follow: %s (F)", client->follow_mode ? "ON" : "OFF"), 10, y, 18,
+             client->follow_mode ? PUFF_GREEN : LIGHTGRAY);
     y += 30;
 
     // Inspect mode stats
