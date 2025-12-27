@@ -5,6 +5,7 @@
 #include "drone.h"
 #include "puffernet.h"
 #include <time.h>
+#include "render.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -81,10 +82,13 @@ void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* act
     lstm(net->lstm, net->gelu1->output);
     linear(net->actor, net->lstm->state_h);
     linear(net->value_fn, net->lstm->state_h);
-    for (int i = 0; i < net->num_actions; i++) {
-        float std = expf(net->log_std[i]);
-        float mean = net->actor->output[i];
-        actions[i] = randn(mean, std);
+    
+    for (int b = 0; b < net->num_agents; b++) {
+        for (int i = 0; i < net->num_actions; i++) {
+            float std = expf(net->log_std[i]);
+            float mean = net->actor->output[b * net->num_actions + i];
+            actions[b * net->num_actions + i] = randn(mean, std);
+        }
     }
 }
 
@@ -133,10 +137,9 @@ int main() {
     env->rewards = (float*)calloc(env->num_agents, sizeof(float));
     env->terminals = (unsigned char*)calloc(env->num_agents, sizeof(float));
 
-    // Weights *weights = load_weights("resources/drone/drone_weights.bin", 136073);
-    // int logit_sizes[1] = {4};
-    // LinearContLSTM *net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes,
-    // 1);
+    Weights *weights = load_weights("resources/drone/puffer_drone_weights.bin", 136201);
+    int logit_sizes[1] = {4};
+    LinearContLSTM *net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
 
     if (!env->observations || !env->actions || !env->rewards) {
         fprintf(stderr, "ERROR: Failed to allocate memory for demo buffers.\n");
@@ -163,13 +166,13 @@ int main() {
     c_render(env);
 
     while (!WindowShouldClose()) {
-        // forward_linearcontlstm(net, env->observations, env->actions);
+        forward_linearcontlstm(net, env->observations, env->actions);
         c_step(env);
         c_render(env);
     }
 
     c_close(env);
-    // free_linearcontlstm(net);
+    free_linearcontlstm(net);
     free(env->observations);
     free(env->actions);
     free(env->rewards);
