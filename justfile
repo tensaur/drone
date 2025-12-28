@@ -14,7 +14,7 @@ alias e := eval
 alias t := train
 alias fmt := format
 
-# list all recipies
+# list all recipes
 default:
     @just --list
 
@@ -28,7 +28,7 @@ build: build-puffer build-firmware
 
 [private]
 _check_venv:
-    uv sync --quiet
+    uv sync --inexact --quiet
 
 # format the specified C files, or all in project if no args
 format +FILES=c-source:
@@ -53,10 +53,10 @@ build-puffer: _check_venv
     uv pip show pufferlib
     ../.venv/bin/python3 setup.py build_ext --inplace
 
-# evaluate the env with the specified model on a device (tip: use `just bp eval` to build the env and then eval it)
+# eval the env with a given model, use `MODEL=latest` for last trained (tip: use `just bp eval` to build the env and then eval it)
 [group: "puffer"]
-eval DEVICE="cpu" MODEL="latest":
-    ./.venv/bin/puffer eval puffer_drone --train.device {{DEVICE}} --load-model-path {{MODEL}}
+eval DEVICE="cpu" MODEL="":
+    ./.venv/bin/puffer eval puffer_drone --train.device {{DEVICE}} {{ if MODEL == "" { "" } else { "--load-model-path " + MODEL } }}
 
 # train the model on a specific device, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
