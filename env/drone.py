@@ -4,6 +4,7 @@ import gymnasium
 import pufferlib
 from pufferlib.ocean.drone import binding
 
+# python bindings for drone env
 class Drone(pufferlib.PufferEnv):
     def __init__(
         self,

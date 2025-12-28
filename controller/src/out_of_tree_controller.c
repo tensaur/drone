@@ -97,9 +97,9 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
     state_input[11] = toTarget.y / GRID_Y;
     state_input[12] = toTarget.z / GRID_Z;
 
-    state_input[13] = clip(toTarget.x, -1.0f, 1.0f);
-    state_input[14] = clip(toTarget.y, -1.0f, 1.0f);
-    state_input[15] = clip(toTarget.z, -1.0f, 1.0f);
+    state_input[13] = clampf(toTarget.x, -1.0f, 1.0f);
+    state_input[14] = clampf(toTarget.y, -1.0f, 1.0f);
+    state_input[15] = clampf(toTarget.z, -1.0f, 1.0f);
 
     if (use_rl) {
         puffer_use_direct_motor_output = true;

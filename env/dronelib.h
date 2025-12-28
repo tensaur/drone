@@ -151,8 +151,6 @@ static inline float clampf(float v, float min, float max) {
     return v;
 }
 
-static inline float clip(float v, float min, float max) { return clampf(v, min, max); }
-
 static inline float rndf(float a, float b) {
     return a + ((float)rand() / (float)RAND_MAX) * (b - a);
 }
