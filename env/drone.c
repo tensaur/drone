@@ -4,8 +4,8 @@
 
 #include "drone.h"
 #include "puffernet.h"
-#include <time.h>
 #include "render.h"
+#include <time.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -82,7 +82,7 @@ void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* act
     lstm(net->lstm, net->gelu1->output);
     linear(net->actor, net->lstm->state_h);
     linear(net->value_fn, net->lstm->state_h);
-    
+
     for (int b = 0; b < net->num_agents; b++) {
         for (int i = 0; i < net->num_actions; i++) {
             float std = expf(net->log_std[i]);
@@ -137,9 +137,9 @@ int main() {
     env->rewards = (float*)calloc(env->num_agents, sizeof(float));
     env->terminals = (unsigned char*)calloc(env->num_agents, sizeof(float));
 
-    Weights *weights = load_weights("resources/drone/puffer_drone_weights.bin", 136201);
+    Weights* weights = load_weights("resources/drone/puffer_drone_weights.bin", 136201);
     int logit_sizes[1] = {4};
-    LinearContLSTM *net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
+    LinearContLSTM* net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
 
     if (!env->observations || !env->actions || !env->rewards) {
         fprintf(stderr, "ERROR: Failed to allocate memory for demo buffers.\n");

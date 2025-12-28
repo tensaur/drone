@@ -1,5 +1,6 @@
 # crazyflie
 *.o
+*.d
 *.cmd
 
 # puffer
