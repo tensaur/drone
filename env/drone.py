@@ -46,6 +46,8 @@ class Drone(pufferlib.PufferEnv):
                 i,
                 num_agents=num_drones,
                 max_rings=max_rings,
+                env_index=i,
+                num_envs=num_envs,
             ))
 
         self.c_envs = binding.vectorize(*c_envs)

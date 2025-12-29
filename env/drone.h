@@ -33,6 +33,9 @@ struct DroneEnv {
     Target* ring_buffer;
 
     Client* client;
+
+    int env_index;
+    int num_envs;
 };
 
 void init(DroneEnv* env) {
@@ -44,7 +47,7 @@ void init(DroneEnv* env) {
     }
 
     env->log = (Log){0};
-    env->tick = 0;
+    env->tick = (HORIZON * env->env_index) / env->num_envs;
 }
 
 void add_log(DroneEnv* env, int idx, bool oob, bool ring_collision, bool timeout) {
@@ -153,7 +156,6 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
 }
 
 void c_reset(DroneEnv* env) {
-    env->tick = 0;
     int rng = rand();
 
     // if (rng > INT_MAX / 2) {
