@@ -140,21 +140,14 @@ void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
 }
 
 float static_task_reward(Drone* agent, bool collision) {
-    Vec3 to_target = sub3(agent->state.pos, agent->target->pos);
+    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
+    float omega_sq = dot3(agent->state.omega, agent->state.omega);
+    
     float dist_reward = expf(-0.1f * dist);
-
-    float density_reward = collision ? -1.0f : 0.0f;
-    float reward = dist_reward + density_reward;
-
-    if (dist_reward < 0.0f && density_reward < 0.0f) {
-        reward *= -1.0f;
-    }
-
-    float dr = reward - agent->last_dist_reward;
-    agent->last_dist_reward = reward;
-
-    return dr;
+    float omega_reward = expf(-0.01f * omega_sq);
+    
+    return 0.8f * dist_reward + 0.2f * omega_reward;
 }
 
 float dynamic_task_reward(Drone* agent, bool collision, int ring_passage) {
