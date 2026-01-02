@@ -9,6 +9,8 @@
 
 #include "dronelib.h"
 
+#define HOVER_SPAWN_RADIUS 10.0f
+
 typedef enum {
     IDLE,
     HOVER,
@@ -48,7 +50,11 @@ void set_target_idle(Drone* agent) {
 }
 
 void set_target_hover(Drone* agent) {
-    agent->target->pos = agent->state.pos;
+    agent->target->pos = (Vec3){
+        clampf(agent->state.pos.x + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_X, MARGIN_X),
+        clampf(agent->state.pos.y + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Y, MARGIN_Y),
+        clampf(agent->state.pos.z + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Z, MARGIN_Z)
+    };
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
@@ -139,15 +145,31 @@ void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
         set_target_race(agent);
 }
 
-float static_task_reward(Drone* agent, bool collision) {
+int check_success(Drone* agent) {
     Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
-    float omega_sq = dot3(agent->state.omega, agent->state.omega);
+    float vel = norm3(agent->state.vel);
+    float omega = norm3(agent->state.omega);
     
-    float dist_reward = expf(-0.1f * dist);
-    float omega_reward = expf(-0.01f * omega_sq);
+    if (dist < 0.5f && vel < 0.5f && omega < 0.5f) {
+        return 1;
+    }
+    return 0;
+}
+
+float shaping_reward(Drone* agent) {
+    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
+    float dist = norm3(to_target);
     
-    return 0.8f * dist_reward + 0.2f * omega_reward;
+    float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
+    float dist_delta = prev_dist - dist;
+    
+    float shaping = 5.0f * dist_delta;
+    
+    float omega = norm3(agent->state.omega);
+    float omega_penalty = -0.01f * omega;
+        
+    return shaping + omega_penalty;
 }
 
 float dynamic_task_reward(Drone* agent, bool collision, int ring_passage) {

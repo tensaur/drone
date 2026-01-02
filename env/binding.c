@@ -18,7 +18,7 @@ static int my_log(PyObject* dict, Log* log) {
     assign_to_dict(dict, "score", log->score);
     assign_to_dict(dict, "rings_passed", log->rings_passed);
     assign_to_dict(dict, "ring_collisions", log->ring_collision);
-    assign_to_dict(dict, "collision_rate", log->collision_rate);
+    assign_to_dict(dict, "collisions", log->collisions);
     assign_to_dict(dict, "oob", log->oob);
     assign_to_dict(dict, "timeout", log->timeout);
     assign_to_dict(dict, "episode_return", log->episode_return);

@@ -59,7 +59,7 @@ struct Log {
     float episode_return;
     float episode_length;
     float rings_passed;
-    float collision_rate;
+    float collisions;
     float oob;
     float ring_collision;
     float timeout;
@@ -143,6 +143,7 @@ typedef struct {
     int episode_length;
     float score;
     float collisions;
+    int hover_steps;
 } Drone;
 
 static inline float clampf(float v, float min, float max) {

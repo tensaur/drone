@@ -12,6 +12,8 @@
 #include "dronelib.h"
 #include "tasks.h"
 
+#define SUCCESS_HOVER_STEPS 1
+
 typedef struct Client Client;
 typedef struct DroneEnv DroneEnv;
 
@@ -23,7 +25,6 @@ struct DroneEnv {
 
     Log log;
     int tick;
-    int report_interval;
 
     DroneTask task;
     int num_agents;
@@ -39,6 +40,7 @@ struct DroneEnv {
 };
 
 void init(DroneEnv* env) {
+    env->task = HOVER;
     env->agents = (Drone*)calloc(env->num_agents, sizeof(Drone));
     env->ring_buffer = (Target*)calloc(env->max_rings, sizeof(Target));
 
@@ -50,26 +52,25 @@ void init(DroneEnv* env) {
     env->tick = (HORIZON * env->env_index) / env->num_envs;
 }
 
-void add_log(DroneEnv* env, int idx, bool oob, bool ring_collision, bool timeout) {
+void add_log(DroneEnv* env, int idx, bool oob, bool success, bool timeout) {
     Drone* agent = &env->agents[idx];
-    env->log.score += agent->score;
+    
     env->log.episode_return += agent->episode_return;
     env->log.episode_length += agent->episode_length;
-    env->log.collision_rate += agent->collisions / (float)agent->episode_length;
-    env->log.perf += agent->score / (float)agent->episode_length;
-    if (oob) {
-        env->log.oob += 1.0f;
+    env->log.collisions += agent->collisions;
+    
+    if (success) {
+        env->log.score += 1.0f;
+        env->log.perf += 1.0f;
     }
-    if (ring_collision) {
-        env->log.ring_collision += 1.0f;
-    }
-    if (timeout) {
-        env->log.timeout += 1.0f;
-    }
+    if (oob) env->log.oob += 1.0f;
+    if (timeout) env->log.timeout += 1.0f;
+    
     env->log.n += 1.0f;
 
     agent->episode_length = 0;
     agent->episode_return = 0.0f;
+    agent->collisions = 0.0f;
 }
 
 void compute_observations(DroneEnv* env) {
@@ -130,11 +131,10 @@ void compute_observations(DroneEnv* env) {
 }
 
 void reset_agent(DroneEnv* env, Drone* agent, int idx) {
-    agent->last_dist_reward = 0.0f;
     agent->episode_return = 0.0f;
     agent->episode_length = 0;
     agent->collisions = 0.0f;
-    agent->score = 0.0f;
+    agent->hover_steps = 0;
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
@@ -142,13 +142,19 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
 
     init_drone(agent, 0.05f);
 
-    agent->state.pos =
-        (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y), rndf(-MARGIN_Z, MARGIN_Z)};
+    agent->state.pos = (Vec3){
+        rndf(-MARGIN_X, MARGIN_X),
+        rndf(-MARGIN_Y, MARGIN_Y),
+        rndf(-MARGIN_Z, MARGIN_Z)
+    };
 
     if (env->task == RACE) {
         while (norm3(sub3(agent->state.pos, env->ring_buffer[0].pos)) < 2.0f * RING_RADIUS) {
-            agent->state.pos = (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y),
-                                      rndf(-MARGIN_Z, MARGIN_Z)};
+            agent->state.pos = (Vec3){
+                rndf(-MARGIN_X, MARGIN_X),
+                rndf(-MARGIN_Y, MARGIN_Y),
+                rndf(-MARGIN_Z, MARGIN_Z)
+            };
         }
     }
 
@@ -156,14 +162,6 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
 }
 
 void c_reset(DroneEnv* env) {
-    int rng = rand();
-
-    // if (rng > INT_MAX / 2) {
-    //   env->task = RACE;
-    // } else {
-    env->task = (DroneTask)(rng % (TASK_N - 1));
-    //}
-
     if (env->task == RACE) {
         reset_rings(env->ring_buffer, env->max_rings);
     }
@@ -179,79 +177,41 @@ void c_reset(DroneEnv* env) {
 
 void c_step(DroneEnv* env) {
     env->tick = (env->tick + 1) % HORIZON;
-
+    
     for (int i = 0; i < env->num_agents; i++) {
         Drone* agent = &env->agents[i];
-        env->rewards[i] = 0;
-        env->terminals[i] = 0;
-
-        float* atn = &env->actions[4 * i];
-        move_drone(agent, atn);
-
-        bool out_of_bounds = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
-                             agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
-                             agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
-
-        move_target(agent);
-
+        
+        move_drone(agent, &env->actions[4 * i]);
+        agent->episode_length++;
+        
+        bool oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
+                   agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
+                   agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
         bool collision = check_collision(agent, env->agents, env->num_agents);
-        float reward = 0.0f;
+        bool timeout = (agent->episode_length >= HORIZON);
+        
+        bool hovering = check_success(agent);
+        if (hovering) agent->hover_steps++; // could give reward here
+        else agent->hover_steps = 0;
+        bool succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
 
-        if (env->task == RACE) {
-            // Check ring passage
-            Target* ring = &env->ring_buffer[agent->buffer_idx];
-            int ring_passage = check_ring(agent, ring);
-
-            // Ring collision
-            if (ring_passage < 0) {
-                env->rewards[i] = (float)ring_passage;
-                agent->episode_return += (float)ring_passage;
-                env->terminals[i] = 1;
-                add_log(env, i, false, true, false);
+        if (collision) agent->collisions += 1.0f;
+        
+        float reward = shaping_reward(agent);
+        if (oob) reward -= 1.0f;
+        else if (succeeded) reward += 1.0f;
+        else if (collision) reward -= 0.1f;
+        agent->episode_return += reward;
+        env->rewards[i] = reward;
+        
+        env->terminals[i] = (oob || succeeded || timeout) ? 1 : 0;
+        if (oob || succeeded || timeout) {
+            if (env->task == HOVER || !succeeded) {
+                add_log(env, i, oob, succeeded, timeout);
                 reset_agent(env, agent, i);
                 set_target(env->task, env->agents, i, env->num_agents);
-                continue;
             }
-
-            // Successfully passed through ring - advance to next
-            if (ring_passage > 0) {
-                set_target(env->task, env->agents, i, env->num_agents);
-                env->log.rings_passed += 1.0f;
-            }
-
-            reward = dynamic_task_reward(agent, collision, ring_passage);
-        } else {
-            reward = static_task_reward(agent, collision);
         }
-
-        // Update agent state
-        agent->episode_length++;
-        agent->score += reward;
-        if (collision) {
-            agent->collisions += 1.0f;
-        }
-
-        env->rewards[i] = reward;
-        agent->episode_return += reward;
-
-        // Check termination conditions
-        if (out_of_bounds) {
-            env->rewards[i] -= 1.0f;
-            agent->episode_return -= 1.0f;
-            env->terminals[i] = 1;
-            add_log(env, i, true, false, false);
-
-            reset_agent(env, agent, i);
-            set_target(env->task, env->agents, i, env->num_agents);
-            static_task_reward(agent, false);
-        } else if (env->tick >= HORIZON - 1) {
-            env->terminals[i] = 1;
-            add_log(env, i, false, false, true);
-        }
-    }
-
-    if (env->tick >= HORIZON - 1) {
-        c_reset(env);
     }
 
     compute_observations(env);
