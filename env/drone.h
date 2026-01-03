@@ -52,17 +52,13 @@ void init(DroneEnv* env) {
     env->tick = (HORIZON * env->env_index) / env->num_envs;
 }
 
-void add_log(DroneEnv* env, int idx, bool oob, bool success, bool timeout) {
+void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
     Drone* agent = &env->agents[idx];
     
     env->log.episode_return += agent->episode_return;
     env->log.episode_length += agent->episode_length;
     env->log.collisions += agent->collisions;
     
-    if (success) {
-        env->log.score += 1.0f;
-        env->log.perf += 1.0f;
-    }
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
     
@@ -102,10 +98,12 @@ void compute_observations(DroneEnv* env) {
         env->observations[idx++] = agent->state.rpms[2] / agent->params.max_rpm;
         env->observations[idx++] = agent->state.rpms[3] / agent->params.max_rpm;
 
-        env->observations[idx++] = to_target.x / GRID_X;
-        env->observations[idx++] = to_target.y / GRID_Y;
-        env->observations[idx++] = to_target.z / GRID_Z;
-
+        // this is body frame so we have to be careful about scaling
+        // because distances are relative to the drone orientation
+        env->observations[idx++] = to_target.x / MAX_DIST;
+        env->observations[idx++] = to_target.y / MAX_DIST;
+        env->observations[idx++] = to_target.z / MAX_DIST;
+        
         env->observations[idx++] = clampf(to_target.x, -1.0f, 1.0f);
         env->observations[idx++] = clampf(to_target.y, -1.0f, 1.0f);
         env->observations[idx++] = clampf(to_target.z, -1.0f, 1.0f);
@@ -135,10 +133,11 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     agent->episode_length = 0;
     agent->collisions = 0.0f;
     agent->hover_steps = 0;
+    agent->rings_passed = 0;
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
-    agent->buffer_idx = -1;
+    agent->buffer_idx = 0;
 
     init_drone(agent, 0.05f);
 
@@ -181,6 +180,7 @@ void c_step(DroneEnv* env) {
     for (int i = 0; i < env->num_agents; i++) {
         Drone* agent = &env->agents[i];
         
+        agent->prev_pos = agent->state.pos;
         move_drone(agent, &env->actions[4 * i]);
         agent->episode_length++;
         
@@ -188,32 +188,47 @@ void c_step(DroneEnv* env) {
                    agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
                    agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
         bool collision = check_collision(agent, env->agents, env->num_agents);
-        bool timeout = (agent->episode_length >= HORIZON);
-        
-        bool hovering = check_success(agent);
-        if (hovering) agent->hover_steps++; // could give reward here
-        else agent->hover_steps = 0;
-        bool succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
-
+        // bool timeout = (agent->episode_length >= HORIZON);
+        bool timeout = false;
         if (collision) agent->collisions += 1.0f;
         
         float reward = shaping_reward(agent);
+        //if (collision) reward -= 0.1f;
         if (oob) reward -= 1.0f;
-        else if (succeeded) reward += 1.0f;
-        else if (collision) reward -= 0.1f;
+        
+        bool succeeded = false;
+        if (env->task == RACE) {
+            int ring_result = check_ring(agent, &env->ring_buffer[agent->buffer_idx]);
+            succeeded = (ring_result > 0);
+            if (succeeded) env->log.rings_passed += 1.0f;
+            if (ring_result < 0) env->log.ring_collision += 1.0f;
+        } else {
+            bool hovering = check_success(agent);
+            if (hovering) agent->hover_steps++;
+            else agent->hover_steps = 0;
+            succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
+        }
+        
+        if (succeeded) {
+            reward += 1.0f;
+            agent->hover_steps = 0;
+            env->log.score += 1.0f;
+            set_target(env->task, env->agents, i, env->num_agents);
+        }
+        
         agent->episode_return += reward;
         env->rewards[i] = reward;
         
-        env->terminals[i] = (oob || succeeded || timeout) ? 1 : 0;
-        if (oob || succeeded || timeout) {
-            if (env->task == HOVER || !succeeded) {
-                add_log(env, i, oob, succeeded, timeout);
-                reset_agent(env, agent, i);
-                set_target(env->task, env->agents, i, env->num_agents);
-            }
+        bool failed = oob || timeout;
+        env->terminals[i] = failed ? 1 : 0;
+        
+        if (failed) {
+            add_log(env, i, oob, timeout);
+            reset_agent(env, agent, i);
+            set_target(env->task, env->agents, i, env->num_agents);
         }
     }
-
+    
     compute_observations(env);
 }
 

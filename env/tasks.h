@@ -164,12 +164,10 @@ float shaping_reward(Drone* agent) {
     float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
     float dist_delta = prev_dist - dist;
     
-    float shaping = 5.0f * dist_delta;
-    
     float omega = norm3(agent->state.omega);
     float omega_penalty = -0.01f * omega;
         
-    return shaping + omega_penalty;
+    return dist_delta + omega_penalty;
 }
 
 float dynamic_task_reward(Drone* agent, bool collision, int ring_passage) {

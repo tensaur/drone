@@ -144,6 +144,7 @@ typedef struct {
     float score;
     float collisions;
     int hover_steps;
+    int rings_passed;
 } Drone;
 
 static inline float clampf(float v, float min, float max) {
@@ -445,7 +446,6 @@ static inline void move_drone(Drone* drone, float* actions) {
     for (int s = 0; s < ACTION_SUBSTEPS; s++) {
         float dt = DT * rndf(1.0f - DT_RNG, 1.0f + DT_RNG);
 
-        drone->prev_pos = drone->state.pos;
         rk4_step(&drone->state, &drone->params, actions, dt);
 
         clamp3(&drone->state.vel, -drone->params.max_vel, drone->params.max_vel);
