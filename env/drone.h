@@ -80,9 +80,11 @@ void compute_observations(DroneEnv* env) {
         Vec3 to_target_world = sub3(agent->target->pos, agent->state.pos);
         Vec3 to_target = quat_rotate(q_inv, to_target_world);
 
-        env->observations[idx++] = linear_vel_body.x / agent->params.max_vel;
-        env->observations[idx++] = linear_vel_body.y / agent->params.max_vel;
-        env->observations[idx++] = linear_vel_body.z / agent->params.max_vel;
+        // we should probably clamp the overall velocity
+        float denom = agent->params.max_vel * 1.7320508f; // sqrt(3)
+        env->observations[idx++] = linear_vel_body.x / denom;
+        env->observations[idx++] = linear_vel_body.y / denom;
+        env->observations[idx++] = linear_vel_body.z / denom;
 
         env->observations[idx++] = agent->state.omega.x / agent->params.max_omega;
         env->observations[idx++] = agent->state.omega.y / agent->params.max_omega;
