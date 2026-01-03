@@ -50,11 +50,13 @@ void set_target_idle(Drone* agent) {
 }
 
 void set_target_hover(Drone* agent) {
-    agent->target->pos = (Vec3){
-        clampf(agent->state.pos.x + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_X, MARGIN_X),
-        clampf(agent->state.pos.y + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Y, MARGIN_Y),
-        clampf(agent->state.pos.z + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Z, MARGIN_Z)
-    };
+    agent->target->pos =
+        (Vec3){clampf(agent->state.pos.x + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_X,
+                      MARGIN_X),
+               clampf(agent->state.pos.y + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Y,
+                      MARGIN_Y),
+               clampf(agent->state.pos.z + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Z,
+                      MARGIN_Z)};
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
@@ -150,7 +152,7 @@ int check_success(Drone* agent) {
     float dist = norm3(to_target);
     float vel = norm3(agent->state.vel);
     float omega = norm3(agent->state.omega);
-    
+
     if (dist < 0.5f && vel < 0.5f && omega < 0.5f) {
         return 1;
     }
@@ -160,17 +162,12 @@ int check_success(Drone* agent) {
 float shaping_reward(Drone* agent) {
     Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
-    
+
     float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
     float dist_delta = prev_dist - dist;
-    
+
     float omega = norm3(agent->state.omega);
     float omega_penalty = -0.01f * omega;
-        
-    return dist_delta + omega_penalty;
-}
 
-float dynamic_task_reward(Drone* agent, bool collision, int ring_passage) {
-    float density_reward = collision ? -1.0f : 0.0f;
-    return density_reward + (float)ring_passage;
+    return dist_delta + omega_penalty;
 }

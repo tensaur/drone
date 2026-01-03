@@ -54,14 +54,14 @@ void init(DroneEnv* env) {
 
 void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
     Drone* agent = &env->agents[idx];
-    
+
     env->log.episode_return += agent->episode_return;
     env->log.episode_length += agent->episode_length;
     env->log.collisions += agent->collisions;
-    
+
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
-    
+
     env->log.n += 1.0f;
 
     agent->episode_length = 0;
@@ -105,7 +105,7 @@ void compute_observations(DroneEnv* env) {
         env->observations[idx++] = to_target.x / MAX_DIST;
         env->observations[idx++] = to_target.y / MAX_DIST;
         env->observations[idx++] = to_target.z / MAX_DIST;
-        
+
         env->observations[idx++] = clampf(to_target.x, -1.0f, 1.0f);
         env->observations[idx++] = clampf(to_target.y, -1.0f, 1.0f);
         env->observations[idx++] = clampf(to_target.z, -1.0f, 1.0f);
@@ -139,23 +139,17 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
-    agent->buffer_idx = 0;
+    agent->buffer_idx = -1;
 
     init_drone(agent, 0.05f);
 
-    agent->state.pos = (Vec3){
-        rndf(-MARGIN_X, MARGIN_X),
-        rndf(-MARGIN_Y, MARGIN_Y),
-        rndf(-MARGIN_Z, MARGIN_Z)
-    };
+    agent->state.pos =
+        (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y), rndf(-MARGIN_Z, MARGIN_Z)};
 
     if (env->task == RACE) {
         while (norm3(sub3(agent->state.pos, env->ring_buffer[0].pos)) < 2.0f * RING_RADIUS) {
-            agent->state.pos = (Vec3){
-                rndf(-MARGIN_X, MARGIN_X),
-                rndf(-MARGIN_Y, MARGIN_Y),
-                rndf(-MARGIN_Z, MARGIN_Z)
-            };
+            agent->state.pos = (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y),
+                                      rndf(-MARGIN_Z, MARGIN_Z)};
         }
     }
 
@@ -178,14 +172,14 @@ void c_reset(DroneEnv* env) {
 
 void c_step(DroneEnv* env) {
     env->tick = (env->tick + 1) % HORIZON;
-    
+
     for (int i = 0; i < env->num_agents; i++) {
         Drone* agent = &env->agents[i];
-        
+
         agent->prev_pos = agent->state.pos;
         move_drone(agent, &env->actions[4 * i]);
         agent->episode_length++;
-        
+
         bool oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
                    agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
                    agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
@@ -193,11 +187,11 @@ void c_step(DroneEnv* env) {
         // bool timeout = (agent->episode_length >= HORIZON);
         bool timeout = false;
         if (collision) agent->collisions += 1.0f;
-        
+
         float reward = shaping_reward(agent);
-        //if (collision) reward -= 0.1f;
+        // if (collision) reward -= 0.1f;
         if (oob) reward -= 1.0f;
-        
+
         bool succeeded = false;
         if (env->task == RACE) {
             int ring_result = check_ring(agent, &env->ring_buffer[agent->buffer_idx]);
@@ -206,31 +200,33 @@ void c_step(DroneEnv* env) {
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
             bool hovering = check_success(agent);
-            if (hovering) agent->hover_steps++;
-            else agent->hover_steps = 0;
+            if (hovering)
+                agent->hover_steps++;
+            else
+                agent->hover_steps = 0;
             succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
         }
-        
+
         if (succeeded) {
             reward += 1.0f;
             agent->hover_steps = 0;
             env->log.score += 1.0f;
             set_target(env->task, env->agents, i, env->num_agents);
         }
-        
+
         agent->episode_return += reward;
         env->rewards[i] = reward;
-        
+
         bool failed = oob || timeout;
         env->terminals[i] = failed ? 1 : 0;
-        
+
         if (failed) {
             add_log(env, i, oob, timeout);
             reset_agent(env, agent, i);
             set_target(env->task, env->agents, i, env->num_agents);
         }
     }
-    
+
     compute_observations(env);
 }
 
