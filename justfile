@@ -12,6 +12,7 @@ alias f := flash-firmware
 alias flash := flash-firmware
 alias e := eval
 alias t := train
+alias swp := sweep
 alias fmt := format
 
 # list all recipes
@@ -19,6 +20,7 @@ default:
     @just --list
 
 c-source := `git ls-files --cached --others --exclude-standard '*.c' '*.h' ':!controller/src/dronelib.h' | xargs`
+py-source := `git ls-files --cached --others --exclude-standard '*.py' | xargs`
 
 # setup submodules, pufferlib env and crazyflie firmware
 setup: update-submodules setup-puffer setup-firmware
@@ -62,6 +64,11 @@ eval DEVICE="cpu" MODEL="":
 [group: "puffer"]
 train DEVICE="cpu" TRACK="":
     ./.venv/bin/puffer train puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }}
+
+# sweep for hypers on a specific device, optionally specify TRACK to log stats to the specified wandb project
+[group: "puffer"]
+sweep DEVICE="cpu" TRACK="":
+    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }}
 
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
