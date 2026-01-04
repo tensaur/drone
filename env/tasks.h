@@ -122,7 +122,6 @@ void set_target_flag(Drone* agent, int idx) {
 }
 
 void set_target_race(Drone* agent) {
-    agent->buffer_idx = (agent->buffer_idx + 1) % agent->buffer_size;
     *agent->target = agent->buffer[agent->buffer_idx];
 }
 
@@ -153,7 +152,7 @@ int check_success(Drone* agent) {
     float vel = norm3(agent->state.vel);
     float omega = norm3(agent->state.omega);
 
-    if (dist < 0.5f && vel < 0.5f && omega < 0.5f) {
+    if (dist < 0.1f && vel < 0.1f && omega < 0.1f) {
         return 1;
     }
     return 0;
@@ -167,7 +166,7 @@ float shaping_reward(Drone* agent) {
     float dist_delta = prev_dist - dist;
 
     float omega = norm3(agent->state.omega);
-    float omega_penalty = -0.01f * omega;
+    float omega_penalty = -0.001f * omega;
 
     return dist_delta + omega_penalty;
 }

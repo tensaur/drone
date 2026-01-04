@@ -46,6 +46,7 @@ void init(DroneEnv* env) {
 
     for (int i = 0; i < env->num_agents; i++) {
         env->agents[i].target = (Target*)calloc(1, sizeof(Target));
+        env->agents[i].buffer_idx = 0;
     }
 
     env->log = (Log){0};
@@ -102,13 +103,13 @@ void compute_observations(DroneEnv* env) {
 
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
-        env->observations[idx++] = to_target.x / MAX_DIST;
-        env->observations[idx++] = to_target.y / MAX_DIST;
-        env->observations[idx++] = to_target.z / MAX_DIST;
+        env->observations[idx++] = tanhf(to_target.x / HOVER_SPAWN_RADIUS);
+        env->observations[idx++] = tanhf(to_target.y / HOVER_SPAWN_RADIUS);
+        env->observations[idx++] = tanhf(to_target.z / HOVER_SPAWN_RADIUS);
 
-        env->observations[idx++] = clampf(to_target.x, -1.0f, 1.0f);
-        env->observations[idx++] = clampf(to_target.y, -1.0f, 1.0f);
-        env->observations[idx++] = clampf(to_target.z, -1.0f, 1.0f);
+        env->observations[idx++] = tanhf(to_target.x);
+        env->observations[idx++] = tanhf(to_target.y);
+        env->observations[idx++] = tanhf(to_target.z);
 
         Vec3 normal_body = quat_rotate(q_inv, agent->target->normal);
         env->observations[idx++] = normal_body.x;
@@ -139,7 +140,6 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
-    agent->buffer_idx = -1;
 
     init_drone(agent, 0.05f);
 
@@ -196,7 +196,10 @@ void c_step(DroneEnv* env) {
         if (env->task == RACE) {
             int ring_result = check_ring(agent, &env->ring_buffer[agent->buffer_idx]);
             succeeded = (ring_result > 0);
-            if (succeeded) env->log.rings_passed += 1.0f;
+            if (succeeded) {
+                agent->buffer_idx = (agent->buffer_idx + 1) % agent->buffer_size;
+                env->log.rings_passed += 1.0f;
+            }
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
             bool hovering = check_success(agent);
@@ -211,16 +214,15 @@ void c_step(DroneEnv* env) {
             reward += 1.0f;
             agent->hover_steps = 0;
             env->log.score += 1.0f;
-            set_target(env->task, env->agents, i, env->num_agents);
         }
 
         agent->episode_return += reward;
         env->rewards[i] = reward;
 
-        bool failed = oob || timeout;
-        env->terminals[i] = failed ? 1 : 0;
+        bool reset = oob || timeout || succeeded;
+        env->terminals[i] = reset ? 1 : 0;
 
-        if (failed) {
+        if (reset) {
             add_log(env, i, oob, timeout);
             reset_agent(env, agent, i);
             set_target(env->task, env->agents, i, env->num_agents);
