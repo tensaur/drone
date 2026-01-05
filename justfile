@@ -57,18 +57,18 @@ build-puffer: _check_venv
 
 # eval the env with a given model, use `MODEL=latest` for last trained (tip: use `just bp eval` to build the env and then eval it)
 [group: "puffer"]
-eval DEVICE="cpu" MODEL="":
-    ./.venv/bin/puffer eval puffer_drone --train.device {{DEVICE}} {{ if MODEL == "" { "" } else { "--load-model-path " + MODEL } }}
+eval DEVICE="cpu" MODEL="" TASK="":
+    ./.venv/bin/puffer eval puffer_drone --train.device {{DEVICE}} {{ if MODEL == "" { "" } else { "--load-model-path " + MODEL } }} {{ if TASK == "" { "" } else { "--env.task" + TASK } }}
 
-# train the model on a specific device, optionally specify TRACK to log stats to the specified wandb project
+# train the model on a task using a specific device, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
-train DEVICE="cpu" TRACK="":
-    ./.venv/bin/puffer train puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }}
+train DEVICE="cpu" TASK="hover" TRACK="":
+    ./.venv/bin/puffer train puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task" + TASK } }}
 
 # sweep for hypers on a specific device, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
-sweep DEVICE="cpu" TRACK="":
-    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }}
+sweep DEVICE="cpu" TASK="hover" TRACK="":
+    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task" + TASK } }}
 
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
