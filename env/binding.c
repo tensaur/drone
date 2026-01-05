@@ -1,14 +1,23 @@
 #include "drone.h"
 #include "render.h"
 
+#include <Python.h>
+
 #define Env DroneEnv
 #include "../env_binding.h"
 
 static int my_init(Env* env, PyObject* args, PyObject* kwargs) {
+    PyObject* val = PyDict_GetItemString(kwargs, "task");
+    if (val && PyUnicode_Check(val)) {
+        env->task_arg = PyUnicode_AsUTF8(val);
+    }
+
     env->num_agents = unpack(kwargs, "num_agents");
     env->max_rings = unpack(kwargs, "max_rings");
     env->env_index = unpack(kwargs, "env_index");
     env->num_envs = unpack(kwargs, "num_envs");
+    env->alpha_dist = unpack(kwargs, "alpha_dist");
+    env->alpha_omega = unpack(kwargs, "alpha_omega");
     init(env);
     return 0;
 }

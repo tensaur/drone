@@ -6,6 +6,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "dronelib.h"
 
@@ -25,6 +26,16 @@ typedef enum {
 
 static char const* TASK_NAMES[TASK_N] = {"idle", "hover", "orbit", "follow",
                                          "cube", "congo", "flag",  "race"};
+
+DroneTask get_task(char* task_name) {
+    for (size_t i = 0; i < TASK_N; i++) {
+        if (strcasecmp(TASK_NAMES[i], task_name) == 0) {
+            return (DroneTask)i;
+        }
+    }
+
+    return HOVER;
+}
 
 void move_target(Drone* agent) {
     agent->target->pos.x += agent->target->vel.x;
@@ -121,9 +132,7 @@ void set_target_flag(Drone* agent, int idx) {
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
-void set_target_race(Drone* agent) {
-    *agent->target = agent->buffer[agent->buffer_idx];
-}
+void set_target_race(Drone* agent) { *agent->target = agent->buffer[agent->buffer_idx]; }
 
 void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
     Drone* agent = &agents[idx];
@@ -158,15 +167,13 @@ int check_success(Drone* agent) {
     return 0;
 }
 
-float shaping_reward(Drone* agent) {
+float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega) {
     Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
+    float omega = norm3(agent->state.omega);
 
     float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
     float dist_delta = prev_dist - dist;
 
-    float omega = norm3(agent->state.omega);
-    float omega_penalty = -0.001f * omega;
-
-    return dist_delta + omega_penalty;
+    return (alpha_dist * dist_delta) - (alpha_omega * omega);
 }

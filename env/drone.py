@@ -8,9 +8,12 @@ from pufferlib.ocean.drone import binding
 class Drone(pufferlib.PufferEnv):
     def __init__(
         self,
+        task="HOVER",
         num_envs=16,
         num_drones=64,
         max_rings=5,
+        alpha_dist=1.0,
+        alpha_omega=0.001,
         render_mode=None,
         report_interval=1024,
         buf=None,
@@ -44,10 +47,13 @@ class Drone(pufferlib.PufferEnv):
                 self.terminals[i*num_drones:(i+1)*num_drones],
                 self.truncations[i*num_drones:(i+1)*num_drones],
                 i,
+                task=task,
                 num_agents=num_drones,
                 max_rings=max_rings,
                 env_index=i,
                 num_envs=num_envs,
+                alpha_dist=alpha_dist,
+                alpha_omega=alpha_omega
             ))
 
         self.c_envs = binding.vectorize(*c_envs)

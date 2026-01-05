@@ -27,6 +27,7 @@ struct DroneEnv {
     int tick;
 
     DroneTask task;
+    char* task_arg;
     int num_agents;
     Drone* agents;
 
@@ -37,10 +38,19 @@ struct DroneEnv {
 
     int env_index;
     int num_envs;
+
+    // reward scaling
+    float alpha_dist;
+    float alpha_omega;
 };
 
 void init(DroneEnv* env) {
-    env->task = HOVER;
+    if (env->task_arg) {
+        env->task = get_task(env->task_arg);
+    } else {
+        env->task = HOVER;
+    }
+
     env->agents = (Drone*)calloc(env->num_agents, sizeof(Drone));
     env->ring_buffer = (Target*)calloc(env->max_rings, sizeof(Target));
 
@@ -188,7 +198,7 @@ void c_step(DroneEnv* env) {
         bool timeout = false;
         if (collision) agent->collisions += 1.0f;
 
-        float reward = shaping_reward(agent);
+        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega);
         // if (collision) reward -= 0.1f;
         if (oob) reward -= 1.0f;
 
