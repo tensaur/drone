@@ -43,7 +43,8 @@ struct DroneEnv {
     float alpha_dist;
     float alpha_omega;
 
-    // hover task success conditions
+    // hover task parameters
+    float hover_target_dist;
     float hover_dist;
     float hover_omega;
     float hover_vel;
@@ -118,9 +119,9 @@ void compute_observations(DroneEnv* env) {
 
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
-        env->observations[idx++] = tanhf(to_target.x / HOVER_SPAWN_RADIUS);
-        env->observations[idx++] = tanhf(to_target.y / HOVER_SPAWN_RADIUS);
-        env->observations[idx++] = tanhf(to_target.z / HOVER_SPAWN_RADIUS);
+        env->observations[idx++] = tanhf(to_target.x / env->hover_target_dist);
+        env->observations[idx++] = tanhf(to_target.y / env->hover_target_dist);
+        env->observations[idx++] = tanhf(to_target.z / env->hover_target_dist);
 
         env->observations[idx++] = tanhf(to_target.x);
         env->observations[idx++] = tanhf(to_target.y);
@@ -179,7 +180,7 @@ void c_reset(DroneEnv* env) {
     for (int i = 0; i < env->num_agents; i++) {
         Drone* agent = &env->agents[i];
         reset_agent(env, agent, i);
-        set_target(env->task, env->agents, i, env->num_agents);
+        set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
     }
 
     compute_observations(env);
@@ -197,7 +198,7 @@ void c_step(DroneEnv* env) {
 
         bool oob;
         if (env->task == HOVER) {
-            oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (HOVER_SPAWN_RADIUS * 2.0f);
+            oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist * 2.0f);
         } else {
             oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
                   agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
@@ -244,7 +245,7 @@ void c_step(DroneEnv* env) {
         if (reset) {
             add_log(env, i, oob, timeout);
             reset_agent(env, agent, i);
-            set_target(env->task, env->agents, i, env->num_agents);
+            set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
         }
     }
 

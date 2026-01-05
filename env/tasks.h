@@ -10,8 +10,6 @@
 
 #include "dronelib.h"
 
-#define HOVER_SPAWN_RADIUS 10.0f
-
 typedef enum {
     IDLE,
     HOVER,
@@ -60,13 +58,13 @@ void set_target_idle(Drone* agent) {
         (Vec3){rndf(-V_TARGET, V_TARGET), rndf(-V_TARGET, V_TARGET), rndf(-V_TARGET, V_TARGET)};
 }
 
-void set_target_hover(Drone* agent) {
+void set_target_hover(Drone* agent, float hover_target_dist) {
     agent->target->pos =
-        (Vec3){clampf(agent->state.pos.x + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_X,
+        (Vec3){clampf(agent->state.pos.x + rndf(-hover_target_dist, hover_target_dist), -MARGIN_X,
                       MARGIN_X),
-               clampf(agent->state.pos.y + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Y,
+               clampf(agent->state.pos.y + rndf(-hover_target_dist, hover_target_dist), -MARGIN_Y,
                       MARGIN_Y),
-               clampf(agent->state.pos.z + rndf(-HOVER_SPAWN_RADIUS, HOVER_SPAWN_RADIUS), -MARGIN_Z,
+               clampf(agent->state.pos.z + rndf(-hover_target_dist, hover_target_dist), -MARGIN_Z,
                       MARGIN_Z)};
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
@@ -134,11 +132,11 @@ void set_target_flag(Drone* agent, int idx) {
 
 void set_target_race(Drone* agent) { *agent->target = agent->buffer[agent->buffer_idx]; }
 
-void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
+void set_target(DroneTask task, Drone* agents, int idx, int num_agents, float hover_target_dist) {
     Drone* agent = &agents[idx];
 
     if (task == IDLE) set_target_idle(agent);
-    else if (task == HOVER) set_target_hover(agent);
+    else if (task == HOVER) set_target_hover(agent, hover_target_dist);
     else if (task == ORBIT) set_target_orbit(agent, idx, num_agents);
     else if (task == FOLLOW) set_target_follow(agents, idx);
     else if (task == CUBE) set_target_cube(agent, idx);

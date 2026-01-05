@@ -425,7 +425,7 @@ void c_render(DroneEnv* env) {
         }
 
         for (int i = 0; i < env->num_agents; i++) {
-            set_target(env->task, env->agents, i, env->num_agents);
+            set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
         }
     }
 
