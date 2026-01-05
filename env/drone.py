@@ -14,6 +14,9 @@ class Drone(pufferlib.PufferEnv):
         max_rings=5,
         alpha_dist=1.0,
         alpha_omega=0.001,
+        hover_dist=0.1,
+        hover_omega=0.1,
+        hover_vel=0.1,
         render_mode=None,
         report_interval=1024,
         buf=None,
@@ -53,7 +56,10 @@ class Drone(pufferlib.PufferEnv):
                 env_index=i,
                 num_envs=num_envs,
                 alpha_dist=alpha_dist,
-                alpha_omega=alpha_omega
+                alpha_omega=alpha_omega,
+                hover_dist=hover_dist,
+                hover_omega=hover_omega,
+                hover_vel=hover_vel,
             ))
 
         self.c_envs = binding.vectorize(*c_envs)

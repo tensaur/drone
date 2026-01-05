@@ -147,13 +147,13 @@ void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
     else if (task == RACE) set_target_race(agent);
 }
 
-int check_success(Drone* agent) {
+int check_success(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
     Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
     float vel = norm3(agent->state.vel);
     float omega = norm3(agent->state.omega);
 
-    if (dist < 0.1f && vel < 0.1f && omega < 0.1f) {
+    if (dist < hover_dist && omega < hover_omega && vel < hover_vel) {
         return 1;
     }
     return 0;

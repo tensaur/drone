@@ -42,6 +42,11 @@ struct DroneEnv {
     // reward scaling
     float alpha_dist;
     float alpha_omega;
+
+    // hover task success conditions
+    float hover_dist;
+    float hover_omega;
+    float hover_vel;
 };
 
 void init(DroneEnv* env) {
@@ -190,9 +195,15 @@ void c_step(DroneEnv* env) {
         move_drone(agent, &env->actions[4 * i]);
         agent->episode_length++;
 
-        bool oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
-                   agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
-                   agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
+        bool oob;
+        if (env->task == HOVER) {
+            oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (HOVER_SPAWN_RADIUS * 2.0f);
+        } else {
+            oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
+                  agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
+                  agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
+        }
+
         bool collision = check_collision(agent, env->agents, env->num_agents);
         // bool timeout = (agent->episode_length >= HORIZON);
         bool timeout = false;
@@ -212,7 +223,7 @@ void c_step(DroneEnv* env) {
             }
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
-            bool hovering = check_success(agent);
+            bool hovering = check_success(agent, env->hover_dist, env->hover_omega, env->hover_vel);
             if (hovering) agent->hover_steps++;
             else agent->hover_steps = 0;
             succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
