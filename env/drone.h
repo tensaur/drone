@@ -213,10 +213,8 @@ void c_step(DroneEnv* env) {
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
             bool hovering = check_success(agent);
-            if (hovering)
-                agent->hover_steps++;
-            else
-                agent->hover_steps = 0;
+            if (hovering) agent->hover_steps++;
+            else agent->hover_steps = 0;
             succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
         }
 

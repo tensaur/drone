@@ -137,22 +137,14 @@ void set_target_race(Drone* agent) { *agent->target = agent->buffer[agent->buffe
 void set_target(DroneTask task, Drone* agents, int idx, int num_agents) {
     Drone* agent = &agents[idx];
 
-    if (task == IDLE)
-        set_target_idle(agent);
-    else if (task == HOVER)
-        set_target_hover(agent);
-    else if (task == ORBIT)
-        set_target_orbit(agent, idx, num_agents);
-    else if (task == FOLLOW)
-        set_target_follow(agents, idx);
-    else if (task == CUBE)
-        set_target_cube(agent, idx);
-    else if (task == CONGO)
-        set_target_congo(agents, idx);
-    else if (task == FLAG)
-        set_target_flag(agent, idx);
-    else if (task == RACE)
-        set_target_race(agent);
+    if (task == IDLE) set_target_idle(agent);
+    else if (task == HOVER) set_target_hover(agent);
+    else if (task == ORBIT) set_target_orbit(agent, idx, num_agents);
+    else if (task == FOLLOW) set_target_follow(agents, idx);
+    else if (task == CUBE) set_target_cube(agent, idx);
+    else if (task == CONGO) set_target_congo(agents, idx);
+    else if (task == FLAG) set_target_flag(agent, idx);
+    else if (task == RACE) set_target_race(agent);
 }
 
 int check_success(Drone* agent) {

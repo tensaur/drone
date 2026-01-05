@@ -34,7 +34,7 @@ _check_venv:
 
 # format the specified C files, or all in project if no args
 format +FILES=c-source:
-    @clang-format -style="{ColumnLimit: 100, IndentWidth: 4, TabWidth: 4, DerivePointerAlignment: false, PointerAlignment: Left, AllowShortIfStatementsOnASingleLine: WithoutElse, IndentCaseLabels: true}" -i {{FILES}}
+    @clang-format -style="{ColumnLimit: 100, IndentWidth: 4, TabWidth: 4, DerivePointerAlignment: false, PointerAlignment: Left, AllowShortIfStatementsOnASingleLine: AllIfsAndElse, IndentCaseLabels: true}" -i {{FILES}}
 
 # update the git submodules (i.e. pufferlib and crazyflie firmware)
 update-submodules:
