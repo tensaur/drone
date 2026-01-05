@@ -68,7 +68,7 @@ train DEVICE="cpu" TASK="hover" TRACK="":
 # sweep for hypers on a specific device, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
 sweep DEVICE="cpu" TASK="hover" TRACK="":
-    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
+    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} --max-runs 10000 {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
 
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
