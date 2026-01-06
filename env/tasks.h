@@ -144,26 +144,3 @@ void set_target(DroneTask task, Drone* agents, int idx, int num_agents, float ho
     else if (task == FLAG) set_target_flag(agent, idx);
     else if (task == RACE) set_target_race(agent);
 }
-
-int check_success(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
-    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
-    float dist = norm3(to_target);
-    float vel = norm3(agent->state.vel);
-    float omega = norm3(agent->state.omega);
-
-    if (dist < hover_dist && omega < hover_omega && vel < hover_vel) {
-        return 1;
-    }
-    return 0;
-}
-
-float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega) {
-    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
-    float dist = norm3(to_target);
-    float omega = norm3(agent->state.omega);
-
-    float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
-    float dist_delta = prev_dist - dist;
-
-    return (alpha_dist * dist_delta) - (alpha_omega * omega);
-}

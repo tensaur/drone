@@ -186,6 +186,17 @@ void c_reset(DroneEnv* env) {
     compute_observations(env);
 }
 
+float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega) {
+    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
+    float dist = norm3(to_target);
+    float omega = norm3(agent->state.omega);
+
+    float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
+    float dist_delta = prev_dist - dist;
+
+    return (alpha_dist * dist_delta) - (alpha_omega * omega);
+}
+
 void c_step(DroneEnv* env) {
     env->tick = (env->tick + 1) % HORIZON;
 
@@ -224,7 +235,7 @@ void c_step(DroneEnv* env) {
             }
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
-            bool hovering = check_success(agent, env->hover_dist, env->hover_omega, env->hover_vel);
+            bool hovering = check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
             if (hovering) agent->hover_steps++;
             else agent->hover_steps = 0;
             succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);

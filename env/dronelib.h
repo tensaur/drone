@@ -468,6 +468,25 @@ static inline void reset_rings(Target* ring_buffer, int num_rings) {
     }
 }
 
+static inline Drone* nearest_drone(Drone* agent, Drone* others, int num_agents) {
+    float min_dist = FLT_MAX;
+    Drone* nearest = NULL;
+
+    for (int i = 0; i < num_agents; i++) {
+        Drone* other = &others[i];
+        if (other == agent) continue;
+
+        float dist = norm3(sub3(agent->state.pos, other->state.pos));
+
+        if (dist < min_dist) {
+            min_dist = dist;
+            nearest = other;
+        }
+    }
+
+    return nearest;
+}
+
 static inline int check_ring(Drone* drone, Target* ring) {
     // previous dot product negative if on the 'entry' side of the ring's plane
     float prev_dot = dot3(sub3(drone->prev_pos, ring->pos), ring->normal);
@@ -497,25 +516,6 @@ static inline int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-static inline Drone* nearest_drone(Drone* agent, Drone* others, int num_agents) {
-    float min_dist = FLT_MAX;
-    Drone* nearest = NULL;
-
-    for (int i = 0; i < num_agents; i++) {
-        Drone* other = &others[i];
-        if (other == agent) continue;
-
-        float dist = norm3(sub3(agent->state.pos, other->state.pos));
-
-        if (dist < min_dist) {
-            min_dist = dist;
-            nearest = other;
-        }
-    }
-
-    return nearest;
-}
-
 static inline bool check_collision(Drone* agent, Drone* others, int num_agents) {
     if (num_agents <= 1) return false;
 
@@ -524,4 +524,16 @@ static inline bool check_collision(Drone* agent, Drone* others, int num_agents) 
     float nearest_dist = norm3(to_nearest);
 
     return nearest_dist < 0.1f;
+}
+
+int check_hover(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
+    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
+    float dist = norm3(to_target);
+    float vel = norm3(agent->state.vel);
+    float omega = norm3(agent->state.omega);
+
+    if (dist < hover_dist && omega < hover_omega && vel < hover_vel) {
+        return 1;
+    }
+    return 0;
 }
