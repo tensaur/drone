@@ -41,6 +41,9 @@ ln -s "$(pwd)/resources" ./pufferlib/pufferlib/resources/drone
 # overwrite hypers config
 ln -sf "$(pwd)/config/drone.ini" ./pufferlib/pufferlib/config/ocean/drone.ini
 
+# overwrite model
+ln -sf "$(pwd)/models/models.py" ./pufferlib/pufferlib/ocean/torch.py
+
 # copy latest env binding to drone project root
 ln -sf ./pufferlib/pufferlib/ocean/env_binding.h ./env_binding.h
 echo -e "${GREEN}OK!${NC}"
