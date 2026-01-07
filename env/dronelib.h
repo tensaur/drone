@@ -142,7 +142,6 @@ typedef struct {
     int episode_length;
     float score;
     float collisions;
-    int hover_steps;
     int rings_passed;
 } Drone;
 

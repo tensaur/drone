@@ -24,6 +24,8 @@ static int my_init(Env* env, PyObject* args, PyObject* kwargs) {
     env->hover_vel = unpack(kwargs, "hover_vel");
     env->hover_target_dist = unpack(kwargs, "hover_target_dist");
     env->rpm_obs = unpack(kwargs, "rpm_obs");
+    env->dist_scale_1 = unpack(kwargs, "dist_scale_1");
+    env->dist_scale_2 = unpack(kwargs, "dist_scale_2");
     init(env);
     return 0;
 }

@@ -12,8 +12,7 @@
 #include "dronelib.h"
 #include "tasks.h"
 
-#define HORIZON 1024
-#define SUCCESS_HOVER_STEPS 1
+#define HORIZON 8192
 
 typedef struct Client Client;
 typedef struct DroneEnv DroneEnv;
@@ -52,6 +51,8 @@ struct DroneEnv {
     float hover_vel;
 
     bool rpm_obs;
+    float dist_scale_1;
+    float dist_scale_2;
 };
 
 void init(DroneEnv* env) {
@@ -73,7 +74,7 @@ void init(DroneEnv* env) {
     env->tick = (HORIZON * env->env_index) / env->num_envs;
 }
 
-void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
+void add_log(DroneEnv* env, int idx, bool oob, bool timeout, bool succeeded) {
     Drone* agent = &env->agents[idx];
 
     env->log.episode_return += agent->episode_return;
@@ -82,6 +83,11 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
 
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
+    if (succeeded) {
+        env->log.perf += 1.0f;
+        // score scales with hover task difficulty
+        env->log.score += (0.1f / env->hover_dist) * (0.1f / env->hover_vel) * (0.1f / env->hover_omega);
+    }
 
     env->log.n += 1.0f;
 
@@ -123,13 +129,13 @@ void compute_observations(DroneEnv* env) {
 
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
-        env->observations[idx++] = tanhf(to_target.x / env->hover_target_dist);
-        env->observations[idx++] = tanhf(to_target.y / env->hover_target_dist);
-        env->observations[idx++] = tanhf(to_target.z / env->hover_target_dist);
+        env->observations[idx++] = tanhf(to_target.x * env->dist_scale_1);
+        env->observations[idx++] = tanhf(to_target.y * env->dist_scale_1);
+        env->observations[idx++] = tanhf(to_target.z * env->dist_scale_1);
 
-        env->observations[idx++] = tanhf(to_target.x);
-        env->observations[idx++] = tanhf(to_target.y);
-        env->observations[idx++] = tanhf(to_target.z);
+        env->observations[idx++] = tanhf(to_target.x * env->dist_scale_2);
+        env->observations[idx++] = tanhf(to_target.y * env->dist_scale_2);
+        env->observations[idx++] = tanhf(to_target.z * env->dist_scale_2);
 
         Vec3 normal_body = quat_rotate(q_inv, agent->target->normal);
         env->observations[idx++] = normal_body.x;
@@ -155,7 +161,6 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     agent->episode_return = 0.0f;
     agent->episode_length = 0;
     agent->collisions = 0.0f;
-    agent->hover_steps = 0;
     agent->rings_passed = 0;
 
     agent->buffer = env->ring_buffer;
@@ -222,13 +227,9 @@ void c_step(DroneEnv* env) {
         }
 
         bool collision = check_collision(agent, env->agents, env->num_agents);
-        // bool timeout = (agent->episode_length >= HORIZON);
-        bool timeout = false;
         if (collision) agent->collisions += 1.0f;
-
-        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel);
-        // if (collision) reward -= 0.1f;
-        if (oob) reward -= 1.0f;
+        
+        bool timeout = (agent->episode_length >= HORIZON);
 
         bool succeeded = false;
         if (env->task == RACE) {
@@ -240,17 +241,13 @@ void c_step(DroneEnv* env) {
             }
             if (ring_result < 0) env->log.ring_collision += 1.0f;
         } else {
-            bool hovering = check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
-            if (hovering) agent->hover_steps++;
-            else agent->hover_steps = 0;
-            succeeded = (agent->hover_steps >= SUCCESS_HOVER_STEPS);
+            succeeded = check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
         }
 
-        if (succeeded) {
-            reward += 1.0f;
-            agent->hover_steps = 0;
-            env->log.score += 1.0f;
-        }
+        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel);
+        // if (collision) reward -= 0.1f;
+        if (oob) reward -= 1.0f;
+        if (succeeded) reward += 1.0f;
 
         agent->episode_return += reward;
         env->rewards[i] = reward;
@@ -259,7 +256,7 @@ void c_step(DroneEnv* env) {
         env->terminals[i] = reset ? 1 : 0;
 
         if (reset) {
-            add_log(env, i, oob, timeout);
+            add_log(env, i, oob, timeout, succeeded);
             reset_agent(env, agent, i);
             set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
         }
