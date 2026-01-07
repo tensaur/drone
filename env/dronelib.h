@@ -43,7 +43,6 @@
 #define V_TARGET 0.05f
 
 // Core Parameters
-#define HORIZON 1024
 #define DT 0.002f // 500 Hz
 #define ACTION_SUBSTEPS 5
 #define ACTION_DT (DT * (float)ACTION_SUBSTEPS) // 100 Hz

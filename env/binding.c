@@ -23,6 +23,7 @@ static int my_init(Env* env, PyObject* args, PyObject* kwargs) {
     env->hover_omega = unpack(kwargs, "hover_omega");
     env->hover_vel = unpack(kwargs, "hover_vel");
     env->hover_target_dist = unpack(kwargs, "hover_target_dist");
+    env->rpm_obs = unpack(kwargs, "rpm_obs");
     init(env);
     return 0;
 }

@@ -12,6 +12,7 @@
 #include "dronelib.h"
 #include "tasks.h"
 
+#define HORIZON 1024
 #define SUCCESS_HOVER_STEPS 1
 
 typedef struct Client Client;
@@ -49,6 +50,8 @@ struct DroneEnv {
     float hover_dist;
     float hover_omega;
     float hover_vel;
+
+    bool rpm_obs;
 };
 
 void init(DroneEnv* env) {
@@ -113,10 +116,10 @@ void compute_observations(DroneEnv* env) {
         env->observations[idx++] = agent->state.quat.y;
         env->observations[idx++] = agent->state.quat.z;
 
-        env->observations[idx++] = agent->state.rpms[0] / agent->params.max_rpm;
-        env->observations[idx++] = agent->state.rpms[1] / agent->params.max_rpm;
-        env->observations[idx++] = agent->state.rpms[2] / agent->params.max_rpm;
-        env->observations[idx++] = agent->state.rpms[3] / agent->params.max_rpm;
+        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[0] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[1] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[2] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[3] / agent->params.max_rpm) : 0.0f;
 
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
@@ -141,9 +144,9 @@ void compute_observations(DroneEnv* env) {
             env->observations[idx++] = clampf(to_nearest.y, -1.0f, 1.0f);
             env->observations[idx++] = clampf(to_nearest.z, -1.0f, 1.0f);
         } else {
-            env->observations[idx++] = MAX_DIST;
-            env->observations[idx++] = MAX_DIST;
-            env->observations[idx++] = MAX_DIST;
+            env->observations[idx++] = 0.0f;
+            env->observations[idx++] = 0.0f;
+            env->observations[idx++] = 0.0f;
         }
     }
 }
