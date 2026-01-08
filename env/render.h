@@ -55,7 +55,7 @@ struct Client {
     float* prop_angles;
     Vec3 prop_centers[NUM_PROPELLERS];
     float model_scale;
-    int render_mode;  // 0 = default (5.0x), 1 = normal (1.0x), 2 = minimal (sphere only)
+    int render_mode; // 0 = default (5.0x), 1 = normal (1.0x), 2 = minimal (sphere only)
 };
 
 // Convert dronelib Quat to raylib Matrix
@@ -442,8 +442,9 @@ void c_render(DroneEnv* env) {
     Vec3 drone_pos = env->agents[client->selected_drone].state.pos;
 
     // Calculate min zoom based on render mode and hover_dist
-    float min_zoom = (client->render_mode == 2) ? env->hover_dist : 
-                     (client->render_mode == 1) ? 1.0f : 5.0f;
+    float min_zoom = (client->render_mode == 2)   ? env->hover_dist
+                     : (client->render_mode == 1) ? 1.0f
+                                                  : 5.0f;
 
     handle_camera_controls(client, drone_pos, min_zoom);
     handle_drone_selection(client, env->num_agents, dt);
@@ -478,9 +479,10 @@ void c_render(DroneEnv* env) {
             client->model_scale = MODEL_SCALE_NORMAL;
         }
         // render_mode 2 = minimal, drone hidden
-        
-        float new_min_zoom = (client->render_mode == 2) ? env->hover_dist : 
-                             (client->render_mode == 1) ? 1.0f : 5.0f;
+
+        float new_min_zoom = (client->render_mode == 2)   ? env->hover_dist
+                             : (client->render_mode == 1) ? 1.0f
+                                                          : 5.0f;
         if (client->camera_distance < new_min_zoom) {
             client->camera_distance = new_min_zoom;
             update_camera_position(client, drone_pos);
@@ -526,9 +528,9 @@ void c_render(DroneEnv* env) {
             // Minimal mode: draw small sphere matching hover_dist size
             float sphere_size = env->hover_dist;
             // Use a distinct color (yellow/orange) to differentiate from target
-            Color drone_sphere_color = (inspect_mode && is_selected) ? 
-                (Color){255, 200, 0, 255} : (Color){255, 165, 0, 200};
-            DrawSphere((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z}, 
+            Color drone_sphere_color = (inspect_mode && is_selected) ? (Color){255, 200, 0, 255}
+                                                                     : (Color){255, 165, 0, 200};
+            DrawSphere((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z},
                        sphere_size, drone_sphere_color);
         } else if (client->use_3d_model && client->model_loaded) {
             DrawDroneModel(client, agent, i, dt, body_color);
@@ -615,9 +617,11 @@ void c_render(DroneEnv* env) {
                  y, 18, client->use_3d_model ? PUFF_GREEN : LIGHTGRAY);
         y += 22;
         const char* mode_names[] = {"5.0x", "1.0x", "Minimal"};
-        Color mode_color = (client->render_mode == 2) ? YELLOW : 
-                          (client->render_mode == 1) ? PUFF_GREEN : LIGHTGRAY;
-        DrawText(TextFormat("Scale: %s (Z)", mode_names[client->render_mode]), 10, y, 18, mode_color);
+        Color mode_color = (client->render_mode == 2)   ? YELLOW
+                           : (client->render_mode == 1) ? PUFF_GREEN
+                                                        : LIGHTGRAY;
+        DrawText(TextFormat("Scale: %s (Z)", mode_names[client->render_mode]), 10, y, 18,
+                 mode_color);
     }
     y += 22;
     DrawText(TextFormat("Follow: %s (F)", client->follow_mode ? "ON" : "OFF"), 10, y, 18,

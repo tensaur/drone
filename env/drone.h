@@ -86,7 +86,8 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout, bool succeeded) {
     if (succeeded) {
         env->log.perf += 1.0f;
         // score scales with hover task difficulty
-        env->log.score += (0.1f / env->hover_dist) * (0.1f / env->hover_vel) * (0.1f / env->hover_omega);
+        env->log.score +=
+            (0.1f / env->hover_dist) * (0.1f / env->hover_vel) * (0.1f / env->hover_omega);
     }
 
     env->log.n += 1.0f;
@@ -122,10 +123,14 @@ void compute_observations(DroneEnv* env) {
         env->observations[idx++] = agent->state.quat.y;
         env->observations[idx++] = agent->state.quat.z;
 
-        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[0] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[1] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[2] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] = env->rpm_obs ? (agent->state.rpms[3] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[0] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[1] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[2] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[3] / agent->params.max_rpm) : 0.0f;
 
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
@@ -219,7 +224,8 @@ void c_step(DroneEnv* env) {
 
         bool oob;
         if (env->task == HOVER) {
-            oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist * 2.0f);
+            oob =
+                norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist * 2.0f);
         } else {
             oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
                   agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
@@ -228,7 +234,7 @@ void c_step(DroneEnv* env) {
 
         bool collision = check_collision(agent, env->agents, env->num_agents);
         if (collision) agent->collisions += 1.0f;
-        
+
         bool timeout = (agent->episode_length >= HORIZON);
 
         bool succeeded = false;

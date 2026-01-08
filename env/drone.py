@@ -4,6 +4,7 @@ import gymnasium
 import pufferlib
 from pufferlib.ocean.drone import binding
 
+
 # python bindings for drone env
 class Drone(pufferlib.PufferEnv):
     def __init__(
@@ -38,7 +39,7 @@ class Drone(pufferlib.PufferEnv):
             low=-1, high=1, shape=(4,), dtype=np.float32
         )
 
-        self.num_agents = num_envs*num_drones
+        self.num_agents = num_envs * num_drones
         self.render_mode = render_mode
         self.report_interval = report_interval
         self.tick = 0
@@ -48,29 +49,31 @@ class Drone(pufferlib.PufferEnv):
 
         c_envs = []
         for i in range(num_envs):
-            c_envs.append(binding.env_init(
-                self.observations[i*num_drones:(i+1)*num_drones],
-                self.actions[i*num_drones:(i+1)*num_drones],
-                self.rewards[i*num_drones:(i+1)*num_drones],
-                self.terminals[i*num_drones:(i+1)*num_drones],
-                self.truncations[i*num_drones:(i+1)*num_drones],
-                i,
-                task=task,
-                num_agents=num_drones,
-                max_rings=max_rings,
-                env_index=i,
-                num_envs=num_envs,
-                alpha_dist=alpha_dist,
-                alpha_omega=alpha_omega,
-                alpha_vel=alpha_vel,
-                hover_target_dist=hover_target_dist,
-                hover_dist=hover_dist,
-                hover_omega=hover_omega,
-                hover_vel=hover_vel,
-                rpm_obs=rpm_obs,
-                dist_scale_1=dist_scale_1,
-                dist_scale_2=dist_scale_2,
-            ))
+            c_envs.append(
+                binding.env_init(
+                    self.observations[i * num_drones : (i + 1) * num_drones],
+                    self.actions[i * num_drones : (i + 1) * num_drones],
+                    self.rewards[i * num_drones : (i + 1) * num_drones],
+                    self.terminals[i * num_drones : (i + 1) * num_drones],
+                    self.truncations[i * num_drones : (i + 1) * num_drones],
+                    i,
+                    task=task,
+                    num_agents=num_drones,
+                    max_rings=max_rings,
+                    env_index=i,
+                    num_envs=num_envs,
+                    alpha_dist=alpha_dist,
+                    alpha_omega=alpha_omega,
+                    alpha_vel=alpha_vel,
+                    hover_target_dist=hover_target_dist,
+                    hover_dist=hover_dist,
+                    hover_omega=hover_omega,
+                    hover_vel=hover_vel,
+                    rpm_obs=rpm_obs,
+                    dist_scale_1=dist_scale_1,
+                    dist_scale_2=dist_scale_2,
+                )
+            )
 
         self.c_envs = binding.vectorize(*c_envs)
 
@@ -99,6 +102,7 @@ class Drone(pufferlib.PufferEnv):
     def close(self):
         binding.vec_close(self.c_envs)
 
+
 def test_performance(timeout=10, atn_cache=1024):
     env = Drone(num_envs=1000)
     env.reset()
@@ -107,6 +111,7 @@ def test_performance(timeout=10, atn_cache=1024):
     actions = [env.action_space.sample() for _ in range(atn_cache)]
 
     import time
+
     start = time.time()
     while time.time() - start < timeout:
         atn = actions[tick % atn_cache]
@@ -114,6 +119,7 @@ def test_performance(timeout=10, atn_cache=1024):
         tick += 1
 
     print(f"SPS: {env.num_agents * tick / (time.time() - start)}")
+
 
 if __name__ == "__main__":
     test_performance()

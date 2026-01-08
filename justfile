@@ -21,6 +21,7 @@ default:
 
 c-source := `git ls-files --cached --others --exclude-standard '*.c' '*.h' ':!controller/src/dronelib.h' | xargs`
 py-source := `git ls-files --cached --others --exclude-standard '*.py' | xargs`
+source := f'{{c-source}} {{py-source}}'
 
 # setup submodules, pufferlib env and crazyflie firmware
 setup: update-submodules setup-puffer setup-firmware
@@ -32,9 +33,31 @@ build: build-puffer build-firmware
 _check_venv:
     uv sync --inexact --quiet
 
+# format the specified source files, or all in project if no args
+format +FILES=source:
+    #!/usr/bin/env sh
+    c_files=""
+    py_files=""
+
+    for f in {{FILES}}; do
+        case "$f" in
+            *.c|*.h) c_files+=" $f" ;;
+            *.py) py_files+=" $f" ;;
+        esac
+    done
+
+    [[ -n "$c_files" ]] && just c-format $c_files
+    [[ -n "$py_files" ]] && just py-format $py_files
+
 # format the specified C files, or all in project if no args
-format +FILES=c-source:
+[private]
+c-format +FILES=c-source:
     @clang-format -style="{ColumnLimit: 100, IndentWidth: 4, TabWidth: 4, DerivePointerAlignment: false, PointerAlignment: Left, AllowShortIfStatementsOnASingleLine: AllIfsAndElse, IndentCaseLabels: true}" -i {{FILES}}
+
+# format the specified Python files, or all in project if no args
+[private]
+py-format +FILES=py-source:
+    @uv tool run black -q {{FILES}}
 
 # update the git submodules (i.e. pufferlib and crazyflie firmware)
 update-submodules:
