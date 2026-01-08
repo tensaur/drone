@@ -22,7 +22,8 @@ Color COLORS[64] = {W, B, B, R, R, B, B, W, B, W, B, R, R, B, W, B, B, B, W, R, 
 #undef B
 
 // 3D model config
-#define MODEL_SCALE 5.0f
+#define MODEL_SCALE_DEFAULT 5.0f
+#define MODEL_SCALE_NORMAL 1.0f
 #define NUM_PROPELLERS 4
 static const int PROP_MESH_IDX[NUM_PROPELLERS] = {5, 6, 7, 8};
 static const float PROP_DIRS[NUM_PROPELLERS] = {1.0f, -1.0f, 1.0f, -1.0f};
@@ -53,6 +54,8 @@ struct Client {
     bool use_3d_model;
     float* prop_angles;
     Vec3 prop_centers[NUM_PROPELLERS];
+    float model_scale;
+    int render_mode;  // 0 = default (5.0x), 1 = normal (1.0x), 2 = minimal (sphere only)
 };
 
 // Convert dronelib Quat to raylib Matrix
@@ -107,7 +110,7 @@ static void update_camera_position(Client* c, Vec3 target_pos) {
     }
 }
 
-void handle_camera_controls(Client* client, Vec3 target_pos) {
+void handle_camera_controls(Client* client, Vec3 target_pos, float min_zoom) {
     Vector2 mouse_pos = GetMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -139,7 +142,7 @@ void handle_camera_controls(Client* client, Vec3 target_pos) {
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
         client->camera_distance -= wheel * 2.0f;
-        client->camera_distance = clampf(client->camera_distance, 5.0f, 100.0f);
+        client->camera_distance = clampf(client->camera_distance, min_zoom, 100.0f);
         update_camera_position(client, target_pos);
     }
 }
@@ -256,8 +259,10 @@ Client* make_client(DroneEnv* env) {
     client->selected_drone = 0;
     client->inspect_mode = false;
     client->follow_mode = false;
-    client->target_fps = 60;
+    client->target_fps = 100;
     client->model_loaded = false;
+    client->model_scale = MODEL_SCALE_DEFAULT;
+    client->render_mode = 0;
 
     // Load 3D model
     const char* model_paths[] = {"resources/crazyflie.glb", "resources/drone/crazyflie.glb",
@@ -331,8 +336,9 @@ void DrawDroneModel(Client* client, Drone* agent, int drone_idx, float dt, Color
         if (angles[p] < 0.0f) angles[p] += 2.0f * PI;
     }
 
-    // Build world transform matrices
-    Matrix mScale = MatrixScale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+    // Build world transform matrices using client's model_scale
+    float scale = client->model_scale;
+    Matrix mScale = MatrixScale(scale, scale, scale);
     Matrix mRot = quat_to_matrix(agent->state.quat);
     Matrix mTrans = MatrixTranslate(agent->state.pos.x, agent->state.pos.y, agent->state.pos.z);
 
@@ -435,12 +441,25 @@ void c_render(DroneEnv* env) {
     // Get selected drone position for camera
     Vec3 drone_pos = env->agents[client->selected_drone].state.pos;
 
-    handle_camera_controls(client, drone_pos);
+    // Calculate min zoom based on render mode and hover_dist
+    float min_zoom = (client->render_mode == 2) ? env->hover_dist : 
+                     (client->render_mode == 1) ? 1.0f : 5.0f;
+
+    handle_camera_controls(client, drone_pos, min_zoom);
     handle_drone_selection(client, env->num_agents, dt);
     handle_fps_control(client, dt);
 
     if (IsKeyPressed(KEY_TAB)) {
         client->inspect_mode = !client->inspect_mode;
+        // When entering inspect mode, turn on follow mode by default
+        if (client->inspect_mode) {
+            client->follow_mode = true;
+            update_camera_position(client, drone_pos);
+        } else {
+            // When exiting inspect mode, turn off follow mode
+            client->follow_mode = false;
+            update_camera_position(client, drone_pos);
+        }
     }
 
     if (IsKeyPressed(KEY_M) && client->model_loaded) {
@@ -449,6 +468,23 @@ void c_render(DroneEnv* env) {
 
     if (IsKeyPressed(KEY_F)) {
         client->follow_mode = !client->follow_mode;
+    }
+
+    if (IsKeyPressed(KEY_Z)) {
+        client->render_mode = (client->render_mode + 1) % 3;
+        if (client->render_mode == 0) {
+            client->model_scale = MODEL_SCALE_DEFAULT;
+        } else if (client->render_mode == 1) {
+            client->model_scale = MODEL_SCALE_NORMAL;
+        }
+        // render_mode 2 = minimal, drone hidden
+        
+        float new_min_zoom = (client->render_mode == 2) ? env->hover_dist : 
+                             (client->render_mode == 1) ? 1.0f : 5.0f;
+        if (client->camera_distance < new_min_zoom) {
+            client->camera_distance = new_min_zoom;
+            update_camera_position(client, drone_pos);
+        }
     }
 
     // Update camera position every frame when in follow mode
@@ -486,7 +522,15 @@ void c_render(DroneEnv* env) {
         bool is_selected = (i == client->selected_drone);
         Color body_color = (inspect_mode && is_selected) ? PUFF_GREEN : COLORS[i % 64];
 
-        if (client->use_3d_model && client->model_loaded) {
+        if (client->render_mode == 2) {
+            // Minimal mode: draw small sphere matching hover_dist size
+            float sphere_size = env->hover_dist;
+            // Use a distinct color (yellow/orange) to differentiate from target
+            Color drone_sphere_color = (inspect_mode && is_selected) ? 
+                (Color){255, 200, 0, 255} : (Color){255, 165, 0, 200};
+            DrawSphere((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z}, 
+                       sphere_size, drone_sphere_color);
+        } else if (client->use_3d_model && client->model_loaded) {
             DrawDroneModel(client, agent, i, dt, body_color);
         } else {
             DrawDronePrimitive(agent, &env->actions[4 * i], body_color);
@@ -533,12 +577,25 @@ void c_render(DroneEnv* env) {
         }
     }
 
-    // Targets (shown in inspect mode)
+    // Targets (shown in inspect mode) - size based on render mode
     if (inspect_mode) {
+        float target_size;
+        if (client->render_mode == 2) {
+            // Minimal mode: target size matches hover_dist
+            target_size = env->hover_dist;
+        } else if (client->render_mode == 1) {
+            // 1.0x scale: target proportional to drone at normal scale
+            target_size = 0.1f;
+        } else {
+            // 5.0x scale: target proportional to drone at default scale
+            target_size = 0.5f;
+        }
+
         for (int i = 0; i < env->num_agents; i++) {
             Vec3 t = env->agents[i].target->pos;
             bool is_selected = (i == client->selected_drone);
-            DrawSphere((Vector3){t.x, t.y, t.z}, is_selected ? 0.5f : 0.45f,
+            float size = is_selected ? target_size * 1.1f : target_size;
+            DrawSphere((Vector3){t.x, t.y, t.z}, size,
                        is_selected ? (Color){0, 255, 100, 180} : (Color){0, 255, 255, 100});
         }
     }
@@ -556,6 +613,11 @@ void c_render(DroneEnv* env) {
     if (client->model_loaded) {
         DrawText(TextFormat("Render: %s (M)", client->use_3d_model ? "3D Model" : "Primitive"), 10,
                  y, 18, client->use_3d_model ? PUFF_GREEN : LIGHTGRAY);
+        y += 22;
+        const char* mode_names[] = {"5.0x", "1.0x", "Minimal"};
+        Color mode_color = (client->render_mode == 2) ? YELLOW : 
+                          (client->render_mode == 1) ? PUFF_GREEN : LIGHTGRAY;
+        DrawText(TextFormat("Scale: %s (Z)", mode_names[client->render_mode]), 10, y, 18, mode_color);
     }
     y += 22;
     DrawText(TextFormat("Follow: %s (F)", client->follow_mode ? "ON" : "OFF"), 10, y, 18,
