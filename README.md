@@ -31,7 +31,11 @@ puffer eval puffer_drone --train.device [cpu|mps|cuda] --load-model-path latest
 
 For details on building and flashing the firmware to hardware (Crazyflie 2.1 Brushless) see the docs [here](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/building-and-flashing/build/).
 
-## Demo
+## Demos
+
+https://github.com/user-attachments/assets/dddf81bd-f7cc-4fb1-b503-6c5b81b7ac9a
+
+https://github.com/user-attachments/assets/9ecc4ebd-f02f-4edf-b5e3-7d46836964dd
 
 https://github.com/user-attachments/assets/6224c872-db01-47dd-8682-9fa20bcf34e5
 
