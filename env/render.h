@@ -378,12 +378,14 @@ void DrawDroneModel(Client* client, Drone* agent, int drone_idx, float dt, Color
     }
 }
 
-void DrawDronePrimitive(Drone* agent, float* actions, Color body_color) {
-    DrawSphere((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z}, 0.3f,
+void DrawDronePrimitive(Client* client, Drone* agent, float* actions, Color body_color) {
+    const float scale = client->model_scale;
+
+    DrawSphere((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z}, 0.06f * scale,
                body_color);
 
-    const float rotor_radius = 0.15f;
-    const float arm_len = 0.75f;
+    const float rotor_radius = 0.03f * scale;
+    const float arm_len = 0.15f * scale;
     const float diag = arm_len * 0.7071f; // 1/sqrt(2)
 
     Vec3 rotor_offsets[4] = {
@@ -404,7 +406,7 @@ void DrawDronePrimitive(Drone* agent, float* actions, Color body_color) {
 
         DrawSphere(rotor_pos, rotor_radius, rotor_color);
         DrawCylinderEx((Vector3){agent->state.pos.x, agent->state.pos.y, agent->state.pos.z},
-                       rotor_pos, 0.02f, 0.02f, 8, BLACK);
+                       rotor_pos, 0.004f * scale, 0.004f * scale, 8, BLACK);
     }
 }
 
@@ -535,7 +537,7 @@ void c_render(DroneEnv* env) {
         } else if (client->use_3d_model && client->model_loaded) {
             DrawDroneModel(client, agent, i, dt, body_color);
         } else {
-            DrawDronePrimitive(agent, &env->actions[4 * i], body_color);
+            DrawDronePrimitive(client, agent, &env->actions[4 * i], body_color);
         }
 
         // Velocity vector
