@@ -115,7 +115,7 @@ setup-puffer-symlinks:
 
 # setup firmware: clean, configure for target device, and then build (incl. OOT controller)
 [group: "crazyflie"]
-setup-firmware: setup-firmware-symlinks clean-firmware configure-firmware build-firmware
+setup-firmware: setup-firmware-symlinks configure-firmware clean-firmware build-firmware
 
 # create symlinks in crazyflie submodule for firmware dev
 [group: "crazyflie"]
