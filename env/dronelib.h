@@ -283,9 +283,8 @@ static inline void init_drone(Drone* drone, float dr) {
 
     drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr);
 
-    float hover = rpm_hover(&drone->params);
     for (int i = 0; i < 4; i++)
-        drone->state.rpms[i] = hover;
+        drone->state.rpms[i] = 0.0f;
 
     drone->state.pos = (Vec3){0.0f, 0.0f, 0.0f};
     drone->prev_pos = drone->state.pos;
@@ -534,4 +533,49 @@ int check_hover(Drone* agent, float hover_dist, float hover_omega, float hover_v
         return 1;
     }
     return 0;
+}
+
+void compute_drone_observations(Drone* agent, float* observations) {
+    int idx = 0;
+
+    Quat q_inv = quat_inverse(agent->state.quat);
+    Vec3 linear_vel_body = quat_rotate(q_inv, agent->state.vel);
+    Vec3 to_target_world = sub3(agent->target->pos, agent->state.pos);
+    Vec3 to_target = quat_rotate(q_inv, to_target_world);
+
+    // we should probably clamp the overall velocity
+    float denom = agent->params.max_vel * 1.7320508f; // sqrt(3)
+    observations[idx++] = linear_vel_body.x / denom;
+    observations[idx++] = linear_vel_body.y / denom;
+    observations[idx++] = linear_vel_body.z / denom;
+
+    observations[idx++] = agent->state.omega.x / agent->params.max_omega;
+    observations[idx++] = agent->state.omega.y / agent->params.max_omega;
+    observations[idx++] = agent->state.omega.z / agent->params.max_omega;
+
+    observations[idx++] = agent->state.quat.w;
+    observations[idx++] = agent->state.quat.x;
+    observations[idx++] = agent->state.quat.y;
+    observations[idx++] = agent->state.quat.z;
+
+    // this is body frame so we have to be careful about scaling
+    // because distances are relative to the drone orientation
+    observations[idx++] = tanhf(to_target.x * 0.1f);
+    observations[idx++] = tanhf(to_target.y * 0.1f);
+    observations[idx++] = tanhf(to_target.z * 0.1f);
+
+    observations[idx++] = tanhf(to_target.x * 10.0f);
+    observations[idx++] = tanhf(to_target.y * 10.0f);
+    observations[idx++] = tanhf(to_target.z * 10.0f);
+
+    Vec3 normal_body = quat_rotate(q_inv, agent->target->normal);
+    observations[idx++] = normal_body.x;
+    observations[idx++] = normal_body.y;
+    observations[idx++] = normal_body.z;
+
+    // rpms should always be last in the obs
+    observations[idx++] = agent->state.rpms[0] / agent->params.max_rpm;
+    observations[idx++] = agent->state.rpms[1] / agent->params.max_rpm;
+    observations[idx++] = agent->state.rpms[2] / agent->params.max_rpm;
+    observations[idx++] = agent->state.rpms[3] / agent->params.max_rpm;
 }
