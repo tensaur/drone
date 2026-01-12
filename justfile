@@ -65,7 +65,7 @@ update-submodules:
 
 # setup and build puffer, also creates symlinks for env
 [group: "puffer"]
-setup-puffer: setup-symlinks install-puffer build-puffer
+setup-puffer: setup-puffer-symlinks install-puffer build-puffer
 
 # installs pufferlib to the python venv using uv
 [group: "puffer"]
@@ -95,7 +95,7 @@ sweep DEVICE="cpu" TASK="hover" TRACK="":
 
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
-setup-symlinks:
+setup-puffer-symlinks:
     # overwrite env source code
     @rm -rf ./pufferlib/pufferlib/ocean/drone
     ln -s "$(pwd)/env" ./pufferlib/pufferlib/ocean/drone
@@ -115,7 +115,12 @@ setup-symlinks:
 
 # setup firmware: clean, configure for target device, and then build (incl. OOT controller)
 [group: "crazyflie"]
-setup-firmware: clean-firmware configure-firmware build-firmware
+setup-firmware: setup-firmware-symlinks clean-firmware configure-firmware build-firmware
+
+# create symlinks in crazyflie submodule for firmware dev
+[group: "crazyflie"]
+setup-firmware-symlinks:
+    ln -sf "$(pwd)/controller/src/stabilizer.c" ./crazyflie-firmware/src/modules/src/stabilizer.c
 
 # clean previous builds of firmware and OOT controller
 [group: "crazyflie", working-directory: "controller"]
