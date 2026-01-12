@@ -110,7 +110,7 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
             float scaled = (actions_output[i] + 1) / 2;
             if (scaled < 0) scaled = 0;
             if (scaled > 1) scaled = 1;
-            // scaled = 0.2f;
+            scaled = 0.15f;
 
             motor_cmd[i] = scaled * UINT16_MAX;
             motorsSetRatio(motors[i], motor_cmd[i]);

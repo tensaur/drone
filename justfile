@@ -137,6 +137,11 @@ build-firmware:
 flash-firmware: _check_venv
     make cload
 
+# open firmware control gui
+[group: "crazyflie"]
+gui:
+    ./.venv/bin/cfclient
+
 # configure firmware builds for the specified target device (cf21bl|cf2|bolt)
 [group: "crazyflie", working-directory: "controller", arg("PLATFORM", pattern="cf21bl|cf2|bolt")]
 configure-firmware PLATFORM="cf21bl":
