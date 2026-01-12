@@ -123,15 +123,6 @@ void compute_observations(DroneEnv* env) {
         env->observations[idx++] = agent->state.quat.y;
         env->observations[idx++] = agent->state.quat.z;
 
-        env->observations[idx++] =
-            env->rpm_obs ? (agent->state.rpms[0] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] =
-            env->rpm_obs ? (agent->state.rpms[1] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] =
-            env->rpm_obs ? (agent->state.rpms[2] / agent->params.max_rpm) : 0.0f;
-        env->observations[idx++] =
-            env->rpm_obs ? (agent->state.rpms[3] / agent->params.max_rpm) : 0.0f;
-
         // this is body frame so we have to be careful about scaling
         // because distances are relative to the drone orientation
         env->observations[idx++] = tanhf(to_target.x * env->dist_scale_1);
@@ -159,6 +150,16 @@ void compute_observations(DroneEnv* env) {
             env->observations[idx++] = 0.0f;
             env->observations[idx++] = 0.0f;
         }
+
+        // rpms should always be last in the obs
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[0] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[1] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[2] / agent->params.max_rpm) : 0.0f;
+        env->observations[idx++] =
+            env->rpm_obs ? (agent->state.rpms[3] / agent->params.max_rpm) : 0.0f;
     }
 }
 
@@ -236,7 +237,7 @@ void c_step(DroneEnv* env) {
         if (collision) agent->collisions += 1.0f;
 
         bool timeout = (agent->episode_length >= HORIZON);
-
+            
         bool succeeded = false;
         if (env->task == RACE) {
             int ring_result = check_ring(agent, &env->ring_buffer[agent->buffer_idx]);

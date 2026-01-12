@@ -67,11 +67,13 @@ class Drone(nn.Module):
                 torch.zeros(1, env.single_action_space.shape[0])
             )
 
-        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 1), std=1)
+        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size+4, 1), std=1)
 
     def forward_eval(self, observations, state=None):
-        hidden = self.encode_observations(observations, state=state)
-        logits, values = self.decode_actions(hidden)
+        rpms = observations[:, -4:]
+        actor_obs = torch.cat([observations[:, :-4], torch.zeros_like(rpms)], dim=1) # not edited inplace bc not sure if use elsewhere
+        hidden = self.encode_observations(actor_obs, state=state)
+        logits, values = self.decode_actions(hidden, rpms)
         return logits, values
 
     def forward(self, observations, state=None):
@@ -80,19 +82,9 @@ class Drone(nn.Module):
     def encode_observations(self, observations, state=None):
         """Encodes a batch of observations into hidden states. Assumes
         no time dimension (handled by LSTM wrappers)."""
-        batch_size = observations.shape[0]
-        if self.is_dict_obs:
-            observations = pufferlib.pytorch.nativize_tensor(observations, self.dtype)
-            observations = torch.cat(
-                [v.view(batch_size, -1) for v in observations.values()], dim=1
-            )
-        else:
-            observations = observations.view(batch_size, -1)
         return self.encoder(observations.float())
 
-    def decode_actions(self, hidden):
-        """Decodes a batch of hidden states into (multi)discrete actions.
-        Assumes no time dimension (handled by LSTM wrappers)."""
+    def decode_actions(self, hidden, rpms=None):
         if self.is_multidiscrete:
             logits = self.decoder(hidden).split(self.action_nvec, dim=1)
         elif self.is_continuous:
@@ -102,6 +94,12 @@ class Drone(nn.Module):
             logits = torch.distributions.Normal(mean, std)
         else:
             logits = self.decoder(hidden)
-
-        values = self.value(hidden)
+        
+        # only critic gets rpms
+        if rpms is not None:
+            critic_input = torch.cat([hidden, rpms], dim=1)
+        else:
+            critic_input = torch.cat([hidden, torch.zeros(hidden.shape[0], 4, device=hidden.device)], dim=1)
+        
+        values = self.value(critic_input)
         return logits, values
