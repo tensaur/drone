@@ -538,7 +538,12 @@ int check_hover(Drone* agent, float hover_dist, float hover_omega, float hover_v
 void compute_drone_observations(Drone* agent, float* observations) {
     int idx = 0;
 
-    Quat q_inv = quat_inverse(agent->state.quat);
+    // choose the hemisphere with w >= 0
+    // to avoid observation sign ambiguity
+    Quat q = agent->state.quat;
+    //if (q.w < 0.0f) {q.w=-q.w; q.x=-q.x; q.y=-q.y; q.z=-q.z;}
+
+    Quat q_inv = quat_inverse(q);
     Vec3 linear_vel_body = quat_rotate(q_inv, agent->state.vel);
     Vec3 to_target_world = sub3(agent->target->pos, agent->state.pos);
     Vec3 to_target = quat_rotate(q_inv, to_target_world);
@@ -553,10 +558,10 @@ void compute_drone_observations(Drone* agent, float* observations) {
     observations[idx++] = agent->state.omega.y / agent->params.max_omega;
     observations[idx++] = agent->state.omega.z / agent->params.max_omega;
 
-    observations[idx++] = agent->state.quat.w;
-    observations[idx++] = agent->state.quat.x;
-    observations[idx++] = agent->state.quat.y;
-    observations[idx++] = agent->state.quat.z;
+    observations[idx++] = q.w;
+    observations[idx++] = q.x;
+    observations[idx++] = q.y;
+    observations[idx++] = q.z;
 
     // this is body frame so we have to be careful about scaling
     // because distances are relative to the drone orientation
