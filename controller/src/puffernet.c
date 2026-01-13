@@ -920,7 +920,7 @@ LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_
     }
     net->actor = make_linear(weights, num_agents, 128, atn_sum);
     net->value_fn = make_linear(weights, num_agents, 128, 1);
-    // net->lstm = make_lstm(weights, num_agents, 128, 128);
+    net->lstm = make_lstm(weights, num_agents, 128, 128);
     return net;
 }
 
@@ -937,12 +937,15 @@ void free_linearcontlstm(LinearContLSTM* net) {
 void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions) {
     linear(net->encoder, observations);
     gelu(net->gelu1, net->encoder->output);
-    // lstm(net->lstm, net->gelu1->output);
-    linear(net->actor, net->gelu1->output);
-    // linear(net->value_fn, net->lstm->state_h);
-    for (int i = 0; i < net->num_actions; i++) {
-        float std = expf(net->log_std[i]);
-        float mean = net->actor->output[i];
-        actions[i] = randn(mean, std);
+    lstm(net->lstm, net->gelu1->output);
+    linear(net->actor, net->lstm->state_h);
+    linear(net->value_fn, net->lstm->state_h);
+
+    for (int b = 0; b < net->num_agents; b++) {
+        for (int i = 0; i < net->num_actions; i++) {
+            float std = expf(net->log_std[i]);
+            float mean = net->actor->output[b * net->num_actions + i];
+            actions[b * net->num_actions + i] = randn(mean, std);
+        }
     }
 }
