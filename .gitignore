@@ -6,6 +6,7 @@
 # puffer
 experiments/
 env_binding.h
+*.bin
 
 venv/
 .DS_Store

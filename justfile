@@ -93,6 +93,14 @@ train DEVICE="cpu" TASK="hover" TRACK="":
 sweep DEVICE="cpu" TASK="hover" TRACK="":
     ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} --max-runs 10000 {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
 
+# export the model weights, and convert to a header file for use in hardware
+[group: "puffer"]
+export MODEL="latest":
+    ./.venv/bin/puffer export puffer_drone --load-model-path {{MODEL}} --train.device cpu
+    mkdir -p ./build
+    gcc -o ./build/bin2h ./tools/bin2h.c
+    ./build/bin2h puffer_drone_weights.bin ./controller/src/weights.h
+
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
 setup-puffer-symlinks:
