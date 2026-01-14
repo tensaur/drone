@@ -21,9 +21,10 @@ import numpy as np
 
 
 class Drone(nn.Module):
-    def __init__(self, env, hidden_size=128):
+    def __init__(self, env, linear_size=128, lstm_size=16):
         super().__init__()
-        self.hidden_size = hidden_size
+        self.hidden_size = lstm_size  # keep name for wrapper compatibility
+
         self.is_multidiscrete = isinstance(
             env.single_action_space, pufferlib.spaces.MultiDiscrete
         )
@@ -37,41 +38,39 @@ class Drone(nn.Module):
 
         if self.is_dict_obs:
             self.dtype = pufferlib.pytorch.nativize_dtype(env.emulated)
-            input_size = int(
-                sum(np.prod(v.shape) for v in env.env.observation_space.values())
+            input_size = int(sum(np.prod(v.shape) for v in env.env.observation_space.values()))
+            self.encoder = nn.Sequential(
+                layer_init(nn.Linear(input_size, linear_size)),
+                nn.GELU(),
+                layer_init(nn.Linear(linear_size, lstm_size)),
+                nn.GELU(),
             )
-            self.encoder = nn.Linear(input_size, self.hidden_size)
         else:
-            num_obs = np.prod(env.single_observation_space.shape)
-            self.encoder = torch.nn.Sequential(
-                pufferlib.pytorch.layer_init(nn.Linear(num_obs, hidden_size)),
+            num_obs = int(np.prod(env.single_observation_space.shape))
+            self.encoder = nn.Sequential(
+                layer_init(nn.Linear(num_obs, linear_size)),
+                nn.GELU(),
+                layer_init(nn.Linear(linear_size, lstm_size)),
                 nn.GELU(),
             )
 
         if self.is_multidiscrete:
             self.action_nvec = tuple(env.single_action_space.nvec)
             num_atns = sum(self.action_nvec)
-            self.decoder = pufferlib.pytorch.layer_init(
-                nn.Linear(hidden_size, num_atns), std=0.01
-            )
+            self.decoder = layer_init(nn.Linear(lstm_size, num_atns), std=0.01)
         elif not self.is_continuous:
             num_atns = env.single_action_space.n
-            self.decoder = pufferlib.pytorch.layer_init(
-                nn.Linear(hidden_size, num_atns), std=0.01
-            )
+            self.decoder = layer_init(nn.Linear(lstm_size, num_atns), std=0.01)
         else:
-            self.decoder_mean = pufferlib.pytorch.layer_init(
-                nn.Linear(hidden_size, env.single_action_space.shape[0]), std=0.01
-            )
-            self.decoder_logstd = nn.Parameter(
-                torch.zeros(1, env.single_action_space.shape[0])
-            )
+            self.decoder_mean = layer_init(nn.Linear(lstm_size, env.single_action_space.shape[0]), std=0.01)
+            self.decoder_logstd = nn.Parameter(torch.zeros(1, env.single_action_space.shape[0]))
 
-        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size+4, 1), std=1)
+        # only critic gets rpms
+        self.value = layer_init(nn.Linear(lstm_size + 4, 1), std=1)
 
     def forward_eval(self, observations, state=None):
         rpms = observations[:, -4:]
-        actor_obs = torch.cat([observations[:, :-4], torch.zeros_like(rpms)], dim=1) # not edited inplace bc not sure if use elsewhere
+        actor_obs = torch.cat([observations[:, :-4], torch.zeros_like(rpms)], dim=1)
         hidden = self.encode_observations(actor_obs, state=state)
         logits, values = self.decode_actions(hidden, rpms)
         return logits, values
@@ -80,8 +79,6 @@ class Drone(nn.Module):
         return self.forward_eval(observations, state)
 
     def encode_observations(self, observations, state=None):
-        """Encodes a batch of observations into hidden states. Assumes
-        no time dimension (handled by LSTM wrappers)."""
         return self.encoder(observations.float())
 
     def decode_actions(self, hidden, rpms=None):
@@ -90,16 +87,10 @@ class Drone(nn.Module):
         elif self.is_continuous:
             mean = self.decoder_mean(hidden)
             logstd = self.decoder_logstd.expand_as(mean)
-            std = torch.exp(logstd)
-            logits = torch.distributions.Normal(mean, std)
+            logits = Normal(mean, torch.exp(logstd))
         else:
             logits = self.decoder(hidden)
-        
-        # only critic gets rpms
-        if rpms is not None:
-            critic_input = torch.cat([hidden, rpms], dim=1)
-        else:
-            critic_input = torch.cat([hidden, torch.zeros(hidden.shape[0], 4, device=hidden.device)], dim=1)
-        
-        values = self.value(critic_input)
+
+        critic_rpms = rpms if rpms is not None else torch.zeros(hidden.shape[0], 4, device=hidden.device)
+        values = self.value(torch.cat([hidden, critic_rpms], dim=1))
         return logits, values

@@ -5,6 +5,7 @@
 // #include <assert.h>
 
 #include "FreeRTOS.h"
+#include "debug.h"
 
 static inline void* embedded_calloc(size_t count, size_t size) {
     size_t total = count * size;
@@ -891,17 +892,31 @@ void forward_convlstm(ConvLSTM* net, float* observations, int* actions) {
     softmax_multidiscrete(net->multidiscrete, net->actor->output, actions);
 }
 
+#ifndef LINEAR_DIM
+#define LINEAR_DIM 128
+#endif
+
+#ifndef LSTM_DIM
+#define LSTM_DIM 16
+#endif
+
+#ifndef SAMPLE_ACTIONS
+#define SAMPLE_ACTIONS 0
+#endif
+
 typedef struct LinearContLSTM LinearContLSTM;
 struct LinearContLSTM {
     int num_agents;
     float* obs;
+    int num_actions;
     float* log_std;
-    Linear* encoder;
-    GELU* gelu1;
+    Linear* encoder1;
+    GELU*  gelu1;
+    Linear* encoder2;
+    GELU*  gelu2;
     LSTM* lstm;
     Linear* actor;
     Linear* value_fn;
-    int num_actions;
 };
 
 LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_dim,
@@ -910,42 +925,48 @@ LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_
     net->num_agents = num_agents;
     net->obs = calloc(num_agents * input_dim, sizeof(float));
     net->num_actions = logit_sizes[0];
-    net->log_std = weights->data;
-    weights->idx += net->num_actions;
-    net->encoder = make_linear(weights, num_agents, input_dim, 128);
-    net->gelu1 = make_gelu(num_agents, 128);
-    int atn_sum = 0;
-    for (int i = 0; i < num_actions; i++) {
-        atn_sum += logit_sizes[i];
-    }
-    net->actor = make_linear(weights, num_agents, 128, atn_sum);
-    net->value_fn = make_linear(weights, num_agents, 128, 1);
-    net->lstm = make_lstm(weights, num_agents, 128, 128);
+    net->log_std = get_weights(weights, net->num_actions);
+    net->encoder1 = make_linear(weights, num_agents, input_dim, LINEAR_DIM);
+    net->gelu1    = make_gelu(num_agents, LINEAR_DIM);
+    net->encoder2 = make_linear(weights, num_agents, LINEAR_DIM, LSTM_DIM);
+    net->gelu2    = make_gelu(num_agents, LSTM_DIM);
+    net->lstm = make_lstm(weights, num_agents, LSTM_DIM, LSTM_DIM);
+    net->actor = make_linear(weights, num_agents, LSTM_DIM, net->num_actions);
+    net->value_fn = make_linear(weights, num_agents, LSTM_DIM + 4, 1);
+
     return net;
 }
 
 void free_linearcontlstm(LinearContLSTM* net) {
     free(net->obs);
-    free(net->encoder);
+    free(net->encoder1);
     free(net->gelu1);
+    free(net->encoder2);
+    free(net->gelu2);
+    free(net->lstm);
     free(net->actor);
     free(net->value_fn);
-    free(net->lstm);
     free(net);
 }
 
 void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions) {
-    linear(net->encoder, observations);
-    gelu(net->gelu1, net->encoder->output);
-    lstm(net->lstm, net->gelu1->output);
+    linear(net->encoder1, observations);
+    gelu(net->gelu1, net->encoder1->output);
+    linear(net->encoder2, net->gelu1->output);
+    gelu(net->gelu2, net->encoder2->output);
+    lstm(net->lstm, net->gelu2->output);
     linear(net->actor, net->lstm->state_h);
-    linear(net->value_fn, net->lstm->state_h);
 
+#if SAMPLE_ACTIONS
     for (int b = 0; b < net->num_agents; b++) {
         for (int i = 0; i < net->num_actions; i++) {
             float std = expf(net->log_std[i]);
             float mean = net->actor->output[b * net->num_actions + i];
-            actions[b * net->num_actions + i] = randn(mean, std);
+            actions[b * net->num_actions + i] = (float)randn(mean, std);
         }
     }
+#else
+    memcpy(actions, net->actor->output,
+           (size_t)(net->num_agents * net->num_actions) * sizeof(float));
+#endif
 }
