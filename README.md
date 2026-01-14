@@ -4,6 +4,8 @@
 
 This project was presented at the 2025 [Warwick AI](https://warwick.ai) summit. The slides for this talk are available [here](./docs/summit.pdf).
 
+https://github.com/user-attachments/assets/dddf81bd-f7cc-4fb1-b503-6c5b81b7ac9a
+
 ## Setup
 
 A demo version of this environment is provided in the [PufferLib repo](https://github.com/PufferAI/PufferLib/tree/3.0/pufferlib/ocean/drone), which is updated to the latest *stable* version once ready. We also maintain the [development version](./env) in this repo which is symlinked into the pufferlib submodule for easy building and training during development.
