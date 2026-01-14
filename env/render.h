@@ -25,7 +25,7 @@ Color COLORS[64] = {W, B, B, R, R, B, B, W, B, W, B, R, R, B, W, B, B, B, W, R, 
 #define MODEL_SCALE_DEFAULT 5.0f
 #define MODEL_SCALE_NORMAL 1.0f
 #define NUM_PROPELLERS 4
-static const int PROP_MESH_IDX[NUM_PROPELLERS] = {5, 6, 7, 8};
+static const int PROP_MESH_IDX[NUM_PROPELLERS] = {8, 6, 5, 7};
 static const float PROP_DIRS[NUM_PROPELLERS] = {1.0f, -1.0f, 1.0f, -1.0f};
 
 typedef struct Client Client;
