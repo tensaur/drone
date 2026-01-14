@@ -3,8 +3,6 @@
 #include <string.h>
 #include <math.h>
 
-#include "app.h"
-
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -47,20 +45,13 @@ static LinearContLSTM* puffer_controller;
 Drone drone;
 Target target;
 
-void appMain() {
-    DEBUG_PRINT("Waiting for activation ...\n");
-    while (1) {
-        vTaskDelay(M2T(2000));
-    }
-}
-
 void controllerOutOfTreeInit() {
     drone.target = &target;
     init_drone(&drone, 0.0f);
     controllerPidInit();
 
     w.data = (float*)puffer_drone_weights_bin;
-    w.size = 7405;
+    w.size = puffer_drone_weights_bin_size;
     w.idx = 0;
 
     int logit_sizes[1] = {4};
@@ -105,7 +96,7 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
             observations[20] = 0.0f;
             observations[21] = 0.0f;
             observations[22] = 0.0f;
-            
+
             forward_linearcontlstm(puffer_controller, observations, actions);
 
             for (int i = 0; i < 4; i++) {
