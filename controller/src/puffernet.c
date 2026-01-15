@@ -893,7 +893,7 @@ void forward_convlstm(ConvLSTM* net, float* observations, int* actions) {
 }
 
 #ifndef LINEAR_DIM
-#define LINEAR_DIM 128
+#define LINEAR_DIM 64
 #endif
 
 #ifndef LSTM_DIM
@@ -928,7 +928,7 @@ LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_
     net->gelu2    = make_gelu(num_agents, LSTM_DIM);
     net->lstm = make_lstm(weights, num_agents, LSTM_DIM, LSTM_DIM);
     net->actor = make_linear(weights, num_agents, LSTM_DIM, net->num_actions);
-    net->value_fn = make_linear(weights, num_agents, LSTM_DIM + 4, 1);
+    net->value_fn = make_linear(weights, num_agents, LSTM_DIM, 1);
 
     return net;
 }

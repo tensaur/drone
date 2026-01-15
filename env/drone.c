@@ -33,17 +33,27 @@ double randn(double mean, double std) {
     return mean + std * (u * s);
 }
 
+#ifndef LINEAR_DIM
+#define LINEAR_DIM 64
+#endif
+
+#ifndef LSTM_DIM
+#define LSTM_DIM 16
+#endif
+
 typedef struct LinearContLSTM LinearContLSTM;
 struct LinearContLSTM {
     int num_agents;
     float* obs;
+    int num_actions;
     float* log_std;
-    Linear* encoder;
-    GELU* gelu1;
+    Linear* encoder1;
+    GELU*  gelu1;
+    Linear* encoder2;
+    GELU*  gelu2;
     LSTM* lstm;
     Linear* actor;
     Linear* value_fn;
-    int num_actions;
 };
 
 LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_dim,
@@ -52,42 +62,52 @@ LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_
     net->num_agents = num_agents;
     net->obs = calloc(num_agents * input_dim, sizeof(float));
     net->num_actions = logit_sizes[0];
-    net->log_std = weights->data;
-    weights->idx += net->num_actions;
-    net->encoder = make_linear(weights, num_agents, input_dim, 128);
-    net->gelu1 = make_gelu(num_agents, 128);
-    int atn_sum = 0;
-    for (int i = 0; i < num_actions; i++) {
-        atn_sum += logit_sizes[i];
-    }
-    net->actor = make_linear(weights, num_agents, 128, atn_sum);
-    net->value_fn = make_linear(weights, num_agents, 128, 1);
-    net->lstm = make_lstm(weights, num_agents, 128, 128);
+    
+    // Must match export order exactly:
+    net->log_std  = get_weights(weights, net->num_actions);                      // 1. decoder_logstd
+    net->encoder1 = make_linear(weights, num_agents, input_dim, LINEAR_DIM);     // 2-3. encoder.0
+    net->gelu1    = make_gelu(num_agents, LINEAR_DIM);
+    net->encoder2 = make_linear(weights, num_agents, LINEAR_DIM, LSTM_DIM);      // 4-5. encoder.2
+    net->gelu2    = make_gelu(num_agents, LSTM_DIM);
+    net->actor    = make_linear(weights, num_agents, LSTM_DIM, net->num_actions);// 6-7. decoder_mean
+    net->value_fn = make_linear(weights, num_agents, LSTM_DIM, 1);               // 8-9. value (FIX: was LSTM_DIM+4)
+    net->lstm     = make_lstm(weights, num_agents, LSTM_DIM, LSTM_DIM);          // 10-13. lstm
+
     return net;
 }
 
 void free_linearcontlstm(LinearContLSTM* net) {
     free(net->obs);
-    free(net->encoder);
+    free(net->encoder1);
     free(net->gelu1);
+    free(net->encoder2);
+    free(net->gelu2);
+    free(net->lstm);
     free(net->actor);
     free(net->value_fn);
-    free(net->lstm);
     free(net);
 }
 
-void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions) {
-    linear(net->encoder, observations);
-    gelu(net->gelu1, net->encoder->output);
-    lstm(net->lstm, net->gelu1->output);
+void forward_linearcontlstm(LinearContLSTM* net, float* observations) {
+    linear(net->encoder1, observations);
+    gelu(net->gelu1, net->encoder1->output);
+    linear(net->encoder2, net->gelu1->output);
+    gelu(net->gelu2, net->encoder2->output);
+    lstm(net->lstm, net->gelu2->output);
     linear(net->actor, net->lstm->state_h);
-    linear(net->value_fn, net->lstm->state_h);
+}
 
+void sample_linearcontlstm(LinearContLSTM* net, float* actions, int deterministic) {
     for (int b = 0; b < net->num_agents; b++) {
         for (int i = 0; i < net->num_actions; i++) {
-            float std = expf(net->log_std[i]);
-            float mean = net->actor->output[b * net->num_actions + i];
-            actions[b * net->num_actions + i] = randn(mean, std);
+            int idx = b * net->num_actions + i;
+            float mean = net->actor->output[idx];
+            if (deterministic) {
+                actions[idx] = mean;
+            } else {
+                float std = expf(net->log_std[i]);
+                actions[idx] = (float)randn(mean, std);
+            }
         }
     }
 }
@@ -112,7 +132,8 @@ void emscriptenStep(void* e) {
     DroneEnv* env = args->env;
     LinearContLSTM* net = args->net;
 
-    forward_linearcontlstm(net, env->observations, env->actions);
+    forward_linearcontlstm(net, env->observations);
+    sample_linearcontlstm(net, env->actions, 0);
     c_step(env);
     c_render(env);
     return;
@@ -127,17 +148,18 @@ int main() {
     DroneEnv* env = calloc(1, sizeof(DroneEnv));
     env->num_agents = 64;
     env->max_rings = 10;
-    env->task = ORBIT;
+    env->task = HOVER;
+    env->hover_target_dist = 0.5f;
     init(env);
 
-    size_t obs_size = 26;
+    size_t obs_size = 23;
     size_t act_size = 4;
     env->observations = (float*)calloc(env->num_agents * obs_size, sizeof(float));
     env->actions = (float*)calloc(env->num_agents * act_size, sizeof(float));
     env->rewards = (float*)calloc(env->num_agents, sizeof(float));
     env->terminals = (unsigned char*)calloc(env->num_agents, sizeof(float));
 
-    Weights* weights = load_weights("resources/drone/puffer_drone_weights.bin", 136201);
+    Weights* weights = load_weights("puffer_drone_weights.bin", 4841);
     int logit_sizes[1] = {4};
     LinearContLSTM* net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
 
@@ -166,7 +188,8 @@ int main() {
     c_render(env);
 
     while (!WindowShouldClose()) {
-        forward_linearcontlstm(net, env->observations, env->actions);
+        forward_linearcontlstm(net, env->observations);
+        sample_linearcontlstm(net, env->actions, 0);
         c_step(env);
         c_render(env);
     }

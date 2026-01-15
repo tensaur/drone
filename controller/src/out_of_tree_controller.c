@@ -66,8 +66,10 @@ void controllerOutOfTreeInit() {
     DEBUG_PRINT("Weights used: %d / %d\n", w.idx, w.size);
 
     // test forward pass with ones
+    // PUFFERDRONE: Test logits: -60.580 -7.712 -1.272 -5.215
     float test_obs[23];
     for (int i = 0; i < 23; i++) test_obs[i] = 1.0f;
+    test_obs[22] = 0.0f; test_obs[21] = 0.0f; test_obs[20] = 0.0f; test_obs[19] = 0.0f;
     forward_linearcontlstm(puffer_controller, test_obs);
     DEBUG_PRINT("Test logits: %.3f %.3f %.3f %.3f\n",
                 (double)puffer_controller->actor->output[0],
