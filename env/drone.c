@@ -132,6 +132,14 @@ void emscriptenStep(void* e) {
     DroneEnv* env = args->env;
     LinearContLSTM* net = args->net;
 
+    for (int i = 0; i < env->num_agents; i++) {
+        int base = i * obs_size;
+        env->observations[base + 19] = 0.0f;
+        env->observations[base + 20] = 0.0f;
+        env->observations[base + 21] = 0.0f;
+        env->observations[base + 22] = 0.0f;
+    }
+
     forward_linearcontlstm(net, env->observations);
     sample_linearcontlstm(net, env->actions, 0);
     c_step(env);
@@ -146,20 +154,27 @@ int main() {
     srand(time(NULL)); // Seed random number generator
 
     DroneEnv* env = calloc(1, sizeof(DroneEnv));
+    size_t obs_size = 23;
+    size_t act_size = 4;
+
     env->num_agents = 64;
     env->max_rings = 10;
     env->task = HOVER;
     env->hover_target_dist = 0.5f;
+    env->hover_dist = 0.05f;
+    env->hover_omega = 0.05;
+    env->hover_vel = 0.01;
+    env->num_obs = obs_size;
+    env->num_envs = 1;
+    env->env_index = 0;
     init(env);
 
-    size_t obs_size = 23;
-    size_t act_size = 4;
     env->observations = (float*)calloc(env->num_agents * obs_size, sizeof(float));
     env->actions = (float*)calloc(env->num_agents * act_size, sizeof(float));
     env->rewards = (float*)calloc(env->num_agents, sizeof(float));
     env->terminals = (unsigned char*)calloc(env->num_agents, sizeof(float));
 
-    Weights* weights = load_weights("puffer_drone_weights.bin", 4841);
+    Weights* weights = load_weights("resources/drone/puffer_drone_weights.bin", 4841);
     int logit_sizes[1] = {4};
     LinearContLSTM* net = make_linearcontlstm(weights, env->num_agents, obs_size, logit_sizes, 1);
 
@@ -188,6 +203,13 @@ int main() {
     c_render(env);
 
     while (!WindowShouldClose()) {
+        for (int i = 0; i < env->num_agents; i++) {
+            int base = i * obs_size;
+            env->observations[base + 19] = 0.0f;
+            env->observations[base + 20] = 0.0f;
+            env->observations[base + 21] = 0.0f;
+            env->observations[base + 22] = 0.0f;
+        }
         forward_linearcontlstm(net, env->observations);
         sample_linearcontlstm(net, env->actions, 0);
         c_step(env);
