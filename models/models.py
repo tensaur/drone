@@ -65,23 +65,22 @@ class Drone(nn.Module):
             self.decoder_mean = layer_init(nn.Linear(lstm_size, env.single_action_space.shape[0]), std=0.01)
             self.decoder_logstd = nn.Parameter(torch.zeros(1, env.single_action_space.shape[0]))
 
-        # only critic gets rpms
-        self.value = layer_init(nn.Linear(lstm_size + 4, 1), std=1)
+        self.value = layer_init(nn.Linear(lstm_size, 1), std=1)
 
     def forward_eval(self, observations, state=None):
-        rpms = observations[:, -4:]
-        actor_obs = torch.cat([observations[:, :-4], torch.zeros_like(rpms)], dim=1)
-        hidden = self.encode_observations(actor_obs, state=state)
-        logits, values = self.decode_actions(hidden, rpms)
+        hidden = self.encode_observations(observations, state=state)
+        logits, values = self.decode_actions(hidden)
         return logits, values
 
     def forward(self, observations, state=None):
         return self.forward_eval(observations, state)
 
     def encode_observations(self, observations, state=None):
+        # zero out rpms
+        observations = torch.cat([observations[:, :-4], torch.zeros(observations.shape[0], 4, device=observations.device)], dim=1)
         return self.encoder(observations.float())
 
-    def decode_actions(self, hidden, rpms=None):
+    def decode_actions(self, hidden):
         if self.is_multidiscrete:
             logits = self.decoder(hidden).split(self.action_nvec, dim=1)
         elif self.is_continuous:
@@ -91,6 +90,5 @@ class Drone(nn.Module):
         else:
             logits = self.decoder(hidden)
 
-        critic_rpms = rpms if rpms is not None else torch.zeros(hidden.shape[0], 4, device=hidden.device)
-        values = self.value(torch.cat([hidden, critic_rpms], dim=1))
+        values = self.value(hidden)
         return logits, values
