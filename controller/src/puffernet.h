@@ -338,7 +338,8 @@ struct LinearContLSTM {
 LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_dim,
                                     int logit_sizes[], int num_actions);
 void free_linearcontlstm(LinearContLSTM* net);
-void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions);
+void forward_linearcontlstm(LinearContLSTM* net, float* observations);
+void sample_linearcontlstm(LinearContLSTM* net, float* actions, int deterministic);
 
 #ifdef __cplusplus
 }

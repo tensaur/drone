@@ -900,10 +900,6 @@ void forward_convlstm(ConvLSTM* net, float* observations, int* actions) {
 #define LSTM_DIM 16
 #endif
 
-#ifndef SAMPLE_ACTIONS
-#define SAMPLE_ACTIONS 0
-#endif
-
 typedef struct LinearContLSTM LinearContLSTM;
 struct LinearContLSTM {
     int num_agents;
@@ -949,24 +945,26 @@ void free_linearcontlstm(LinearContLSTM* net) {
     free(net);
 }
 
-void forward_linearcontlstm(LinearContLSTM* net, float* observations, float* actions) {
+void forward_linearcontlstm(LinearContLSTM* net, float* observations) {
     linear(net->encoder1, observations);
     gelu(net->gelu1, net->encoder1->output);
     linear(net->encoder2, net->gelu1->output);
     gelu(net->gelu2, net->encoder2->output);
     lstm(net->lstm, net->gelu2->output);
     linear(net->actor, net->lstm->state_h);
+}
 
-#if SAMPLE_ACTIONS
+void sample_linearcontlstm(LinearContLSTM* net, float* actions, int deterministic) {
     for (int b = 0; b < net->num_agents; b++) {
         for (int i = 0; i < net->num_actions; i++) {
-            float std = expf(net->log_std[i]);
-            float mean = net->actor->output[b * net->num_actions + i];
-            actions[b * net->num_actions + i] = (float)randn(mean, std);
+            int idx = b * net->num_actions + i;
+            float mean = net->actor->output[idx];
+            if (deterministic) {
+                actions[idx] = mean;
+            } else {
+                float std = expf(net->log_std[i]);
+                actions[idx] = (float)randn(mean, std);
+            }
         }
     }
-#else
-    memcpy(actions, net->actor->output,
-           (size_t)(net->num_agents * net->num_actions) * sizeof(float));
-#endif
 }

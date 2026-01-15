@@ -64,6 +64,16 @@ void controllerOutOfTreeInit() {
 
     DEBUG_PRINT("Puffer drone controller initialized.\n");
     DEBUG_PRINT("Weights used: %d / %d\n", w.idx, w.size);
+
+    // test forward pass with ones
+    float test_obs[23];
+    for (int i = 0; i < 23; i++) test_obs[i] = 1.0f;
+    forward_linearcontlstm(puffer_controller, test_obs);
+    DEBUG_PRINT("Test logits: %.3f %.3f %.3f %.3f\n",
+                (double)puffer_controller->actor->output[0],
+                (double)puffer_controller->actor->output[1],
+                (double)puffer_controller->actor->output[2],
+                (double)puffer_controller->actor->output[3]);
 }
 
 bool controllerOutOfTreeTest() {
@@ -97,7 +107,8 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
             observations[21] = 0.0f;
             observations[22] = 0.0f;
 
-            forward_linearcontlstm(puffer_controller, observations, actions);
+            forward_linearcontlstm(puffer_controller, observations);
+            sample_linearcontlstm(puffer_controller, actions, 0); // 0 -> stochastic
 
             for (int i = 0; i < 4; i++) {
                 float a = actions[i];
