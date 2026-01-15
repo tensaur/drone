@@ -142,8 +142,9 @@ build-firmware:
 
 # flash the firmware to a Crazyflie drone (requires a Crazyradio with drivers installed on device)
 [group: "crazyflie", working-directory: "controller"]
-flash-firmware: _check_venv
-    make cload
+[arg("auto", long="auto", short="a", value="-w radio://0/80/2M/E7E7E7E7E7")]
+flash-firmware auto="": _check_venv
+    CLOAD_CMDS="{{auto}}" make cload
 
 # open firmware control gui
 [group: "crazyflie"]
