@@ -921,14 +921,16 @@ LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_
     net->num_agents = num_agents;
     net->obs = calloc(num_agents * input_dim, sizeof(float));
     net->num_actions = logit_sizes[0];
-    net->log_std = get_weights(weights, net->num_actions);
-    net->encoder1 = make_linear(weights, num_agents, input_dim, LINEAR_DIM);
+    
+    // Must match export order exactly:
+    net->log_std  = get_weights(weights, net->num_actions);                      // 1. decoder_logstd
+    net->encoder1 = make_linear(weights, num_agents, input_dim, LINEAR_DIM);     // 2-3. encoder.0
     net->gelu1    = make_gelu(num_agents, LINEAR_DIM);
-    net->encoder2 = make_linear(weights, num_agents, LINEAR_DIM, LSTM_DIM);
+    net->encoder2 = make_linear(weights, num_agents, LINEAR_DIM, LSTM_DIM);      // 4-5. encoder.2
     net->gelu2    = make_gelu(num_agents, LSTM_DIM);
-    net->lstm = make_lstm(weights, num_agents, LSTM_DIM, LSTM_DIM);
-    net->actor = make_linear(weights, num_agents, LSTM_DIM, net->num_actions);
-    net->value_fn = make_linear(weights, num_agents, LSTM_DIM, 1);
+    net->actor    = make_linear(weights, num_agents, LSTM_DIM, net->num_actions);// 6-7. decoder_mean
+    net->value_fn = make_linear(weights, num_agents, LSTM_DIM, 1);               // 8-9. value (FIX: was LSTM_DIM+4)
+    net->lstm     = make_lstm(weights, num_agents, LSTM_DIM, LSTM_DIM);          // 10-13. lstm
 
     return net;
 }

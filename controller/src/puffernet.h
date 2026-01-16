@@ -326,13 +326,15 @@ typedef struct LinearContLSTM LinearContLSTM;
 struct LinearContLSTM {
     int num_agents;
     float* obs;
+    int num_actions;
     float* log_std;
-    Linear* encoder;
-    GELU* gelu1;
+    Linear* encoder1;
+    GELU*  gelu1;
+    Linear* encoder2;
+    GELU*  gelu2;
     LSTM* lstm;
     Linear* actor;
     Linear* value_fn;
-    int num_actions;
 };
 
 LinearContLSTM* make_linearcontlstm(Weights* weights, int num_agents, int input_dim,

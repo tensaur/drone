@@ -67,6 +67,7 @@ void controllerOutOfTreeInit() {
 
     // test forward pass with ones
     // PUFFERDRONE: Test logits: -60.580 -7.712 -1.272 -5.215
+    // PUFFERDRONE: Test logits: -60.580 -7.712 -1.272 -5.215
     float test_obs[23];
     for (int i = 0; i < 23; i++) test_obs[i] = 1.0f;
     test_obs[22] = 0.0f; test_obs[21] = 0.0f; test_obs[20] = 0.0f; test_obs[19] = 0.0f;
