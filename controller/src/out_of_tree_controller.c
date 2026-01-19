@@ -111,7 +111,7 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
             observations[22] = 0.0f;
 
             forward_linearcontlstm(puffer_controller, observations);
-            sample_linearcontlstm(puffer_controller, actions, 0); // 0 -> stochastic
+            sample_linearcontlstm(puffer_controller, actions, 1); // 0 -> stochastic
 
             for (int i = 0; i < 4; i++) {
                 float a = actions[i];
