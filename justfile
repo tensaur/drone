@@ -144,7 +144,7 @@ build-firmware:
 [group: "crazyflie", working-directory: "controller"]
 [arg("auto", long="auto", short="a", value="-w radio://0/80/2M/E7E7E7E7E7")]
 flash-firmware auto="": _check_venv
-    CLOAD_CMDS="{{auto}}" make cload
+    CLOAD_CMDS="{{auto}}" uv run make cload
 
 # open firmware control gui
 [group: "crazyflie"]
