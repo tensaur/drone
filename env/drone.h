@@ -164,7 +164,7 @@ void c_step(DroneEnv* env) {
         bool oob;
         if (env->task == HOVER) {
             oob =
-                norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist * 2.0f);
+                norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist + 1.0f);
         } else {
             oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
                   agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||

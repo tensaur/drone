@@ -59,13 +59,24 @@ void set_target_idle(Drone* agent) {
 }
 
 void set_target_hover(Drone* agent, float hover_target_dist) {
-    agent->target->pos =
-        (Vec3){clampf(agent->state.pos.x + rndf(-hover_target_dist, hover_target_dist), -MARGIN_X,
-                      MARGIN_X),
-               clampf(agent->state.pos.y + rndf(-hover_target_dist, hover_target_dist), -MARGIN_Y,
-                      MARGIN_Y),
-               clampf(agent->state.pos.z + rndf(-hover_target_dist, hover_target_dist), -MARGIN_Z,
-                      MARGIN_Z)};
+    // uniform direction on sphere
+    float u = rndf(0.0f, 1.0f);
+    float v = rndf(0.0f, 1.0f);
+    float z = 2.0f * v - 1.0f;
+    float a = 2.0f * (float)M_PI * u;
+    float r_xy = sqrtf(fmaxf(0.0f, 1.0f - z * z));
+    Vec3 dir = (Vec3){r_xy * cosf(a), r_xy * sinf(a), z};
+
+    // uniform radius in ball
+    float rad = hover_target_dist * cbrtf(rndf(0.0f, 1.0f));
+    Vec3 p = add3(agent->state.pos, scalmul3(dir, rad));
+
+    // clamp to grid bounds
+    agent->target->pos = (Vec3){
+        clampf(p.x, -MARGIN_X, MARGIN_X),
+        clampf(p.y, -MARGIN_Y, MARGIN_Y),
+        clampf(p.z, -MARGIN_Z, MARGIN_Z)
+    };
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
