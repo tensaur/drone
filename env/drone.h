@@ -12,7 +12,7 @@
 #include "dronelib.h"
 #include "tasks.h"
 
-#define HORIZON 8192
+#define HORIZON 1024
 
 typedef struct Client Client;
 typedef struct DroneEnv DroneEnv;
@@ -72,7 +72,7 @@ void init(DroneEnv* env) {
     env->tick = (HORIZON * env->env_index) / env->num_envs;
 }
 
-void add_log(DroneEnv* env, int idx, bool oob, bool timeout, bool succeeded) {
+void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
     Drone* agent = &env->agents[idx];
 
     env->log.episode_return += agent->episode_return;
@@ -81,18 +81,23 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout, bool succeeded) {
 
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
-    if (succeeded) {
-        env->log.perf += 1.0f;
-        // score scales with hover task difficulty
-        env->log.score +=
-            (0.1f / env->hover_dist) * (0.1f / env->hover_vel) * (0.1f / env->hover_omega);
-    }
+    
+    //if (env->task == RACE) {
+    //    env->log.score += agent->score;
+    //    env->log.perf += agent->score;
+    //} else {
+    env->log.score += -agent->score / agent->episode_length;
+    env->log.perf += 1.0f / (1.0f + agent->score / agent->episode_length);
+    env->log.rings_passed += agent->rings_passed;
+    //}
 
     env->log.n += 1.0f;
 
     agent->episode_length = 0;
     agent->episode_return = 0.0f;
     agent->collisions = 0.0f;
+    agent->score = 0.0f;
+    agent->rings_passed = 0.0f;
 }
 
 void compute_observations(DroneEnv* env) {
@@ -106,6 +111,7 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     agent->episode_length = 0;
     agent->collisions = 0.0f;
     agent->rings_passed = 0;
+    agent->score = 0.0f;
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
@@ -175,33 +181,32 @@ void c_step(DroneEnv* env) {
         if (collision) agent->collisions += 1.0f;
 
         bool timeout = (agent->episode_length >= HORIZON);
-            
-        bool succeeded = false;
-        if (env->task == RACE) {
-            int ring_result = check_ring(agent, &env->ring_buffer[agent->buffer_idx]);
-            succeeded = (ring_result > 0);
-            if (succeeded) {
-                agent->buffer_idx = (agent->buffer_idx + 1) % agent->buffer_size;
-                env->log.rings_passed += 1.0f;
-            }
-            if (ring_result < 0) env->log.ring_collision += 1.0f;
-        } else {
-            succeeded = check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
-        }
 
         float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel);
+        
+        if (env->task == RACE) {
+            if (check_ring(agent, &env->ring_buffer[agent->buffer_idx]) > 0) {
+                agent->buffer_idx = (agent->buffer_idx + 1) % agent->buffer_size;
+                set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
+                agent->score += 1.0f;
+                agent->rings_passed += 1.0;
+            }
+            agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
+        } else {
+            agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
+        }
+
         // if (collision) reward -= 0.1f;
         if (oob) reward -= 1.0f;
-        if (succeeded) reward += 1.0f;
 
         agent->episode_return += reward;
         env->rewards[i] = reward;
 
-        bool reset = oob || timeout || succeeded;
+        bool reset = oob || timeout;
         env->terminals[i] = reset ? 1 : 0;
 
         if (reset) {
-            add_log(env, i, oob, timeout, succeeded);
+            add_log(env, i, oob, timeout);
             reset_agent(env, agent, i);
             set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
         }
