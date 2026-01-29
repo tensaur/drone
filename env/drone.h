@@ -154,7 +154,10 @@ float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float al
     float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
     float dist_delta = prev_dist - dist;
 
-    return (alpha_dist * dist_delta) - (alpha_omega * omega) - (alpha_vel * vel);
+    // hand tuned, works well
+    float stab_mult = 1.0f + 2.0f * expf(-5.0f * dist);
+
+    return (alpha_dist * dist_delta) - (alpha_omega * omega * stab_mult) - (alpha_vel * vel * stab_mult);
 }
 
 void c_step(DroneEnv* env) {
