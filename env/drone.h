@@ -155,9 +155,9 @@ float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float al
     float dist_delta = prev_dist - dist;
 
     // hand tuned, works well
-    float stab_mult = 1.0f + (is_hover ? 2.0f * expf(-5.0f * dist) : 0.0f);
+    float stab_mult = 1.0f + (is_hover ? 2.0f * expf(-5.0f * prev_dist) : 0.0f);
 
-    return (alpha_dist * dist_delta) - (alpha_omega * omega * stab_mult) - (alpha_vel * vel * stab_mult);
+    return stab_mult * (alpha_dist * dist_delta) - (alpha_omega * omega) - (alpha_vel * vel);
 }
 
 void c_step(DroneEnv* env) {
