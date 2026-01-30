@@ -145,7 +145,7 @@ void c_reset(DroneEnv* env) {
     compute_observations(env);
 }
 
-float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float alpha_vel) {
+float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float alpha_vel, bool is_hover) {
     Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
     float dist = norm3(to_target);
     float omega = norm3(agent->state.omega);
@@ -155,7 +155,7 @@ float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float al
     float dist_delta = prev_dist - dist;
 
     // hand tuned, works well
-    float stab_mult = 1.0f + 2.0f * expf(-5.0f * dist);
+    float stab_mult = 1.0f + (is_hover ? 2.0f * expf(-5.0f * dist) : 0.0f);
 
     return (alpha_dist * dist_delta) - (alpha_omega * omega * stab_mult) - (alpha_vel * vel * stab_mult);
 }
@@ -170,38 +170,13 @@ void c_step(DroneEnv* env) {
         move_drone(agent, &env->actions[4 * i]);
         agent->episode_length++;
 
-        bool oob;
-        if (env->task == HOVER) {
-            oob =
-                norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist + 1.0f);
-        } else {
-            oob = agent->state.pos.x < -GRID_X || agent->state.pos.x > GRID_X ||
-                  agent->state.pos.y < -GRID_Y || agent->state.pos.y > GRID_Y ||
-                  agent->state.pos.z < -GRID_Z || agent->state.pos.z > GRID_Z;
-        }
-
-        bool collision = check_collision(agent, env->agents, env->num_agents);
-        if (collision) agent->collisions += 1.0f;
-
+        bool oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist + 1.0f);
         bool timeout = (agent->episode_length >= HORIZON);
 
-        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel);
-        
-        if (env->task == RACE) {
-            if (check_ring(agent, &env->ring_buffer[agent->buffer_idx]) > 0) {
-                agent->buffer_idx = (agent->buffer_idx + 1) % agent->buffer_size;
-                set_target(env->task, env->agents, i, env->num_agents, env->hover_target_dist);
-                agent->score += 1.0f;
-                agent->rings_passed += 1.0;
-            }
-            agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
-        } else {
-            agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
-        }
-
-        // if (collision) reward -= 0.1f;
+        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel, env->task == HOVER);
         if (oob) reward -= 1.0f;
-
+        
+        agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
         agent->episode_return += reward;
         env->rewards[i] = reward;
 
