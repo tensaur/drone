@@ -283,8 +283,9 @@ static inline void init_drone(Drone* drone, float dr) {
 
     drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr);
 
+    float hover = rpm_hover(&drone->params);
     for (int i = 0; i < 4; i++)
-        drone->state.rpms[i] = 0.0f;
+        drone->state.rpms[i] = hover;
 
     drone->state.pos = (Vec3){0.0f, 0.0f, 0.0f};
     drone->prev_pos = drone->state.pos;
