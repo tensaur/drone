@@ -82,14 +82,9 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
     
-    //if (env->task == RACE) {
-    //    env->log.score += agent->score;
-    //    env->log.perf += agent->score;
-    //} else {
-    env->log.score += -agent->score / agent->episode_length;
-    env->log.perf += 1.0f / (1.0f + agent->score / agent->episode_length);
+    env->log.score += agent->hover_score;
+    env->log.perf += agent->hover_score / (float)agent->episode_length;
     env->log.rings_passed += agent->rings_passed;
-    //}
 
     env->log.n += 1.0f;
 
@@ -112,6 +107,7 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     agent->collisions = 0.0f;
     agent->rings_passed = 0;
     agent->score = 0.0f;
+    agent->hover_score = 0.0f;
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
@@ -173,7 +169,7 @@ void c_step(DroneEnv* env) {
         float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel, env->task == HOVER);
         if (oob) reward -= 1.0f;
         
-        agent->score += norm3(sub3(agent->target->pos, agent->state.pos));
+        agent->hover_score += check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
         agent->episode_return += reward;
         env->rewards[i] = reward;
 
