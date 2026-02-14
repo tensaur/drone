@@ -41,8 +41,9 @@ struct DroneEnv {
 
     // reward scaling
     float alpha_dist;
+    float alpha_hover;
+    float alpha_shaping;
     float alpha_omega;
-    float alpha_vel;
 
     // hover task parameters
     float hover_target_dist;
@@ -81,7 +82,7 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
 
     if (oob) env->log.oob += 1.0f;
     if (timeout) env->log.timeout += 1.0f;
-    
+
     env->log.score += agent->hover_score;
     env->log.perf += agent->hover_score / (float)agent->episode_length;
     env->log.rings_passed += agent->rings_passed;
@@ -125,6 +126,7 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     }
 
     agent->prev_pos = agent->state.pos;
+    agent->prev_potential = hover_potential(agent, env->hover_dist, env->hover_omega, env->hover_vel);
 }
 
 void c_reset(DroneEnv* env) {
@@ -141,18 +143,6 @@ void c_reset(DroneEnv* env) {
     compute_observations(env);
 }
 
-float shaping_reward(Drone* agent, float alpha_dist, float alpha_omega, float alpha_vel, bool is_hover) {
-    Vec3 to_target = sub3(agent->target->pos, agent->state.pos);
-    float dist = norm3(to_target);
-    float omega = norm3(agent->state.omega);
-    float vel = norm3(agent->state.vel);
-
-    float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
-    float dist_delta = prev_dist - dist;
-
-    return (alpha_dist * dist_delta) - (alpha_omega * omega) - (alpha_vel * vel);
-}
-
 void c_step(DroneEnv* env) {
     env->tick = (env->tick + 1) % HORIZON;
 
@@ -166,9 +156,18 @@ void c_step(DroneEnv* env) {
         bool oob = norm3(sub3(agent->target->pos, agent->state.pos)) > (env->hover_target_dist + 1.0f);
         bool timeout = (agent->episode_length >= HORIZON);
 
-        float reward = shaping_reward(agent, env->alpha_dist, env->alpha_omega, env->alpha_vel, env->task == HOVER);
-        if (oob) reward -= 1.0f;
+        float curr = hover_potential(agent, env->hover_dist, env->hover_omega, env->hover_vel);
+        float prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos));
+        float curr_dist = norm3(sub3(agent->target->pos, agent->state.pos));
+        float omega = norm3(agent->state.omega);
+
+        float reward = env->alpha_dist * (prev_dist - curr_dist)
+                     + env->alpha_hover * curr
+                     + env->alpha_shaping * (curr - agent->prev_potential)
+                     - env->alpha_omega * omega;
         
+        agent->prev_potential = curr;
+
         agent->hover_score += check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
         agent->episode_return += reward;
         env->rewards[i] = reward;

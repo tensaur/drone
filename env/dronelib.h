@@ -144,6 +144,7 @@ typedef struct {
     float collisions;
     int rings_passed;
     float hover_score;
+    float prev_potential;
 } Drone;
 
 static inline float clampf(float v, float min, float max) {
@@ -525,6 +526,18 @@ static inline bool check_collision(Drone* agent, Drone* others, int num_agents) 
     return nearest_dist < 0.1f;
 }
 
+float hover_potential(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
+    float dist = norm3(sub3(agent->target->pos, agent->state.pos));
+    float vel = norm3(agent->state.vel);
+    float omega = norm3(agent->state.omega);
+
+    float d = 1.0f / (1.0f + dist / hover_dist);
+    float v = 1.0f / (1.0f + vel / hover_vel);
+    float w = 1.0f / (1.0f + omega / hover_omega);
+
+    return d * (0.7f + 0.15f * v + 0.15f * w);
+}
+
 float check_hover(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
     float dist = norm3(sub3(agent->target->pos, agent->state.pos));
     float vel = norm3(agent->state.vel);
@@ -534,9 +547,9 @@ float check_hover(Drone* agent, float hover_dist, float hover_omega, float hover
         return 0.0f;
 
     return 1.0f
-        - 0.5f * (dist / hover_dist)
-        - 0.25f * (vel / hover_vel)
-        - 0.25f * (omega / hover_omega);
+        - 0.7f * (dist / hover_dist)
+        - 0.15f * (vel / hover_vel)
+        - 0.15f * (omega / hover_omega);
 }
 
 void compute_drone_observations(Drone* agent, float* observations) {

@@ -16,9 +16,10 @@ static int my_init(Env* env, PyObject* args, PyObject* kwargs) {
     env->max_rings = unpack(kwargs, "max_rings");
     env->env_index = unpack(kwargs, "env_index");
     env->num_envs = unpack(kwargs, "num_envs");
-    env->alpha_dist = unpack(kwargs, "alpha_dist");
+    env->alpha_hover = unpack(kwargs, "alpha_hover");
+    env->alpha_shaping = unpack(kwargs, "alpha_shaping");
     env->alpha_omega = unpack(kwargs, "alpha_omega");
-    env->alpha_vel = unpack(kwargs, "alpha_vel");
+    env->alpha_dist = unpack(kwargs, "alpha_dist");
     env->hover_dist = unpack(kwargs, "hover_dist");
     env->hover_omega = unpack(kwargs, "hover_omega");
     env->hover_vel = unpack(kwargs, "hover_vel");
