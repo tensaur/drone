@@ -4,6 +4,8 @@
 
 This project was presented at the 2025 [Warwick AI](https://warwick.ai) summit. The slides for this talk are available [here](./docs/summit.pdf).
 
+https://github.com/user-attachments/assets/1cb9596e-dce3-463b-ad57-9fc5b53a682e
+
 https://github.com/user-attachments/assets/dddf81bd-f7cc-4fb1-b503-6c5b81b7ac9a
 
 ## Setup
