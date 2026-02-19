@@ -145,6 +145,7 @@ typedef struct {
     int rings_passed;
     float hover_score;
     float prev_potential;
+    float hover_ema;
 } Drone;
 
 static inline float clampf(float v, float min, float max) {

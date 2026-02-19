@@ -84,7 +84,7 @@ void add_log(DroneEnv* env, int idx, bool oob, bool timeout) {
     if (timeout) env->log.timeout += 1.0f;
 
     env->log.score += agent->hover_score;
-    env->log.perf += agent->hover_score / (float)agent->episode_length;
+    env->log.perf += agent->hover_ema;
     env->log.rings_passed += agent->rings_passed;
 
     env->log.n += 1.0f;
@@ -109,6 +109,7 @@ void reset_agent(DroneEnv* env, Drone* agent, int idx) {
     agent->rings_passed = 0;
     agent->score = 0.0f;
     agent->hover_score = 0.0f;
+    agent->hover_ema = 0.0f;
 
     agent->buffer = env->ring_buffer;
     agent->buffer_size = env->max_rings;
@@ -168,7 +169,9 @@ void c_step(DroneEnv* env) {
         
         agent->prev_potential = curr;
 
-        agent->hover_score += check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
+        float h = check_hover(agent, env->hover_dist, env->hover_omega, env->hover_vel);
+        agent->hover_score += h;
+        agent->hover_ema = (1.0f - 0.02f) * agent->hover_ema + 0.02f * h;
         agent->episode_return += reward;
         env->rewards[i] = reward;
 
