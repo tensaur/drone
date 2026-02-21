@@ -2,7 +2,7 @@
 
 `drone` is a reinforcement learning based drone controller and simulator tool, which is included in [PufferLib](https://github.com/PufferAI/PufferLib) as a first-party simulator example.
 
-This project was presented at the 2025 [Warwick AI](https://warwick.ai) summit. The slides for this talk are available [here](./docs/summit.pdf).
+This project was presented at the 2025 and 2026 [Warwick AI](https://warwick.ai) summits. The slides for these talks are available in this repo: [2026](./docs/summit-26.pdf), [2025](./docs/summit-25.pdf).
 
 https://github.com/user-attachments/assets/1cb9596e-dce3-463b-ad57-9fc5b53a682e
 
