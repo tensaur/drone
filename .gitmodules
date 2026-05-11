@@ -1,6 +1,7 @@
 [submodule "pufferlib"]
 	path = pufferlib
 	url = https://github.com/pufferai/pufferlib
+	branch = 4.0
 	ignore = dirty
 [submodule "crazyflie-firmware"]
 	path = crazyflie-firmware
