@@ -33,14 +33,20 @@
 #define BASE_MAX_OMEGA 20.0f // rad/s
 
 // Simulation properties
-#define GRID_X 30.0f
-#define GRID_Y 30.0f
-#define GRID_Z 10.0f
+#define GRID_X 10.0f
+#define GRID_Y 10.0f
+#define GRID_Z 5.0f
 #define MARGIN_X (GRID_X - 1)
 #define MARGIN_Y (GRID_Y - 1)
 #define MARGIN_Z (GRID_Z - 1)
 #define RING_RADIUS 2.0f
 #define V_TARGET 0.05f
+
+#define DRONE_OBS_SIZE 19
+
+#define SCORE_DIST_SCALE 0.01f
+#define SCORE_VEL_SCALE 0.01f
+#define SCORE_OMEGA_SCALE 0.1f
 
 // Core Parameters
 #define DT 0.002f // 500 Hz
@@ -64,6 +70,9 @@ struct Log {
     float timeout;
     float score;
     float perf;
+    float ema_dist;
+    float ema_vel;
+    float ema_omega;
     float n;
 };
 
@@ -146,6 +155,9 @@ typedef struct {
     float hover_score;
     float prev_potential;
     float hover_ema;
+    float ema_dist;
+    float ema_vel;
+    float ema_omega;
 } Drone;
 
 static inline float clampf(float v, float min, float max) {
@@ -154,8 +166,8 @@ static inline float clampf(float v, float min, float max) {
     return v;
 }
 
-static inline float rndf(float a, float b) {
-    return a + ((float)rand() / (float)RAND_MAX) * (b - a);
+static inline float rndf(float a, float b, unsigned int* rng) {
+    return a + ((float)rand_r(rng) / (float)RAND_MAX) * (b - a);
 }
 
 static inline Vec3 add3(Vec3 a, Vec3 b) { return (Vec3){a.x + b.x, a.y + b.y, a.z + b.z}; }
@@ -214,10 +226,10 @@ static inline Vec3 quat_rotate(Quat q, Vec3 v) {
 
 static inline Quat quat_inverse(Quat q) { return (Quat){q.w, -q.x, -q.y, -q.z}; }
 
-static inline Quat rndquat(void) {
-    float u1 = rndf(0.0f, 1.0f);
-    float u2 = rndf(0.0f, 1.0f);
-    float u3 = rndf(0.0f, 1.0f);
+static inline Quat rndquat(unsigned int* rng) {
+    float u1 = rndf(0.0f, 1.0f, rng);
+    float u2 = rndf(0.0f, 1.0f, rng);
+    float u3 = rndf(0.0f, 1.0f, rng);
 
     float sqrt_1_minus_u1 = sqrtf(1.0f - u1);
     float sqrt_u1 = sqrtf(u1);
@@ -239,14 +251,14 @@ static inline Quat quat_from_axis_angle(Vec3 axis, float angle) {
     return (Quat){cosf(half), axis.x * s, axis.y * s, axis.z * s};
 }
 
-static inline Target rndring(float radius) {
+static inline Target rndring(unsigned int* rng, float radius) {
     Target ring = (Target){0};
 
-    ring.pos.x = rndf(-GRID_X + 2 * radius, GRID_X - 2 * radius);
-    ring.pos.y = rndf(-GRID_Y + 2 * radius, GRID_Y - 2 * radius);
-    ring.pos.z = rndf(-GRID_Z + 2 * radius, GRID_Z - 2 * radius);
+    ring.pos.x = rndf(-GRID_X + 2 * radius, GRID_X - 2 * radius, rng);
+    ring.pos.y = rndf(-GRID_Y + 2 * radius, GRID_Y - 2 * radius, rng);
+    ring.pos.z = rndf(-GRID_Z + 2 * radius, GRID_Z - 2 * radius, rng);
 
-    ring.orientation = rndquat();
+    ring.orientation = rndquat(rng);
 
     Vec3 base_normal = (Vec3){0.0f, 0.0f, 1.0f};
     ring.normal = quat_rotate(ring.orientation, base_normal);
@@ -268,23 +280,23 @@ static inline float rpm_min_for_centered_hover(const Params* p) {
     return min_rpm;
 }
 
-static inline void init_drone(Drone* drone, float dr) {
-    drone->params.arm_len = BASE_ARM_LEN * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.mass = BASE_MASS * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.ixx = BASE_IXX * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.iyy = BASE_IYY * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.izz = BASE_IZZ * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.k_thrust = BASE_K_THRUST * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.k_ang_damp = BASE_K_ANG_DAMP * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.k_drag = BASE_K_DRAG * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.b_drag = BASE_B_DRAG * rndf(1.0f - dr, 1.0f + dr);
-    drone->params.gravity = BASE_GRAVITY * rndf(0.99f, 1.01f);
+static inline void init_drone(Drone* drone, unsigned int* rng, float dr) {
+    drone->params.arm_len = BASE_ARM_LEN * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.mass = BASE_MASS * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.ixx = BASE_IXX * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.iyy = BASE_IYY * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.izz = BASE_IZZ * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.k_thrust = BASE_K_THRUST * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.k_ang_damp = BASE_K_ANG_DAMP * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.k_drag = BASE_K_DRAG * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.b_drag = BASE_B_DRAG * rndf(1.0f - dr, 1.0f + dr, rng);
+    drone->params.gravity = BASE_GRAVITY * rndf(0.99f, 1.01f, rng);
 
     drone->params.max_rpm = BASE_MAX_RPM;
     drone->params.max_vel = BASE_MAX_VEL;
     drone->params.max_omega = BASE_MAX_OMEGA;
 
-    drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr);
+    drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr, rng);
 
     float hover = rpm_hover(&drone->params);
     for (int i = 0; i < 4; i++)
@@ -445,9 +457,7 @@ static inline void move_drone(Drone* drone, float* actions) {
     clamp4(actions, -1.0f, 1.0f);
 
     for (int s = 0; s < ACTION_SUBSTEPS; s++) {
-        float dt = DT * rndf(1.0f - DT_RNG, 1.0f + DT_RNG);
-
-        rk4_step(&drone->state, &drone->params, actions, dt);
+        rk4_step(&drone->state, &drone->params, actions, DT);
 
         clamp3(&drone->state.vel, -drone->params.max_vel, drone->params.max_vel);
         clamp3(&drone->state.omega, -drone->params.max_omega, drone->params.max_omega);
@@ -458,13 +468,13 @@ static inline void move_drone(Drone* drone, float* actions) {
     }
 }
 
-static inline void reset_rings(Target* ring_buffer, int num_rings) {
-    ring_buffer[0] = rndring(RING_RADIUS);
+static inline void reset_rings(unsigned int* rng, Target* ring_buffer, int num_rings) {
+    ring_buffer[0] = rndring(rng, RING_RADIUS);
 
     // ensure rings are spaced at least 2*ring_radius apart
     for (int i = 1; i < num_rings; i++) {
         do {
-            ring_buffer[i] = rndring(RING_RADIUS);
+            ring_buffer[i] = rndring(rng, RING_RADIUS);
         } while (norm3(sub3(ring_buffer[i].pos, ring_buffer[i - 1].pos)) < 2.0f * RING_RADIUS);
     }
 }
@@ -539,18 +549,17 @@ float hover_potential(Drone* agent, float hover_dist, float hover_omega, float h
     return d * (0.7f + 0.15f * v + 0.15f * w);
 }
 
-float check_hover(Drone* agent, float hover_dist, float hover_omega, float hover_vel) {
+float hover_score(Drone* agent) {
     float dist = norm3(sub3(agent->target->pos, agent->state.pos));
     float vel = norm3(agent->state.vel);
     float omega = norm3(agent->state.omega);
 
-    if (dist >= hover_dist || vel >= hover_vel || omega >= hover_omega)
-        return 0.0f;
+    float d = dist / SCORE_DIST_SCALE;
+    float v = vel / SCORE_VEL_SCALE;
+    float w = omega / SCORE_OMEGA_SCALE;
 
-    return 1.0f
-        - 0.7f * (dist / hover_dist)
-        - 0.15f * (vel / hover_vel)
-        - 0.15f * (omega / hover_omega);
+    float penalty = 0.7f * d + 0.15f * v + 0.15f * w;
+    return 1.0f / (1.0f + 0.05 * penalty);
 }
 
 void compute_drone_observations(Drone* agent, float* observations) {
@@ -597,8 +606,8 @@ void compute_drone_observations(Drone* agent, float* observations) {
     observations[idx++] = normal_body.z;
 
     // rpms should always be last in the obs
-    observations[idx++] = agent->state.rpms[0] / agent->params.max_rpm;
-    observations[idx++] = agent->state.rpms[1] / agent->params.max_rpm;
-    observations[idx++] = agent->state.rpms[2] / agent->params.max_rpm;
-    observations[idx++] = agent->state.rpms[3] / agent->params.max_rpm;
+    //observations[idx++] = agent->state.rpms[0] / agent->params.max_rpm;
+    //observations[idx++] = agent->state.rpms[1] / agent->params.max_rpm;
+    //observations[idx++] = agent->state.rpms[2] / agent->params.max_rpm;
+    //observations[idx++] = agent->state.rpms[3] / agent->params.max_rpm;
 }
