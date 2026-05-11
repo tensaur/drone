@@ -51,24 +51,24 @@ void move_target(Drone* agent) {
     }
 }
 
-void set_target_idle(Drone* agent) {
+void set_target_idle(unsigned int* rng, Drone* agent) {
     agent->target->pos =
-        (Vec3){rndf(-MARGIN_X, MARGIN_X), rndf(-MARGIN_Y, MARGIN_Y), rndf(-MARGIN_Z, MARGIN_Z)};
+        (Vec3){rndf(-MARGIN_X, MARGIN_X, rng), rndf(-MARGIN_Y, MARGIN_Y, rng), rndf(-MARGIN_Z, MARGIN_Z, rng)};
     agent->target->vel =
-        (Vec3){rndf(-V_TARGET, V_TARGET), rndf(-V_TARGET, V_TARGET), rndf(-V_TARGET, V_TARGET)};
+        (Vec3){rndf(-V_TARGET, V_TARGET, rng), rndf(-V_TARGET, V_TARGET, rng), rndf(-V_TARGET, V_TARGET, rng)};
 }
 
-void set_target_hover(Drone* agent, float hover_target_dist) {
+void set_target_hover(unsigned int* rng, Drone* agent, float hover_target_dist) {
     // uniform direction on sphere
-    float u = rndf(0.0f, 1.0f);
-    float v = rndf(0.0f, 1.0f);
+    float u = rndf(0.0f, 1.0f, rng);
+    float v = rndf(0.0f, 1.0f, rng);
     float z = 2.0f * v - 1.0f;
     float a = 2.0f * (float)M_PI * u;
     float r_xy = sqrtf(fmaxf(0.0f, 1.0f - z * z));
     Vec3 dir = (Vec3){r_xy * cosf(a), r_xy * sinf(a), z};
 
     // uniform radius in ball
-    float rad = hover_target_dist * cbrtf(rndf(0.0f, 1.0f));
+    float rad = hover_target_dist * cbrtf(rndf(0.0f, 1.0f, rng));
     Vec3 p = add3(agent->state.pos, scalmul3(dir, rad));
 
     // clamp to grid bounds
@@ -95,11 +95,11 @@ void set_target_orbit(Drone* agent, int idx, int num_agents) {
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
-void set_target_follow(Drone* agents, int idx) {
+void set_target_follow(unsigned int* rng, Drone* agents, int idx) {
     Drone* agent = &agents[idx];
 
     if (idx == 0) {
-        set_target_idle(agent);
+        set_target_idle(rng, agent);
     } else {
         agent->target->pos = agents[0].target->pos;
         agent->target->vel = agents[0].target->vel;
@@ -115,9 +115,9 @@ void set_target_cube(Drone* agent, int idx) {
     agent->target->vel = (Vec3){0.0f, 0.0f, 0.0f};
 }
 
-void set_target_congo(Drone* agents, int idx) {
+void set_target_congo(unsigned int* rng, Drone* agents, int idx) {
     if (idx == 0) {
-        set_target_idle(&agents[0]);
+        set_target_idle(rng, &agents[0]);
         return;
     }
 
@@ -143,15 +143,15 @@ void set_target_flag(Drone* agent, int idx) {
 
 void set_target_race(Drone* agent) { *agent->target = agent->buffer[agent->buffer_idx]; }
 
-void set_target(DroneTask task, Drone* agents, int idx, int num_agents, float hover_target_dist) {
+void set_target(unsigned int* rng, DroneTask task, Drone* agents, int idx, int num_agents, float hover_target_dist) {
     Drone* agent = &agents[idx];
 
-    if (task == IDLE) set_target_idle(agent);
-    else if (task == HOVER) set_target_hover(agent, hover_target_dist);
+    if (task == IDLE) set_target_idle(rng, agent);
+    else if (task == HOVER) set_target_hover(rng, agent, hover_target_dist);
     else if (task == ORBIT) set_target_orbit(agent, idx, num_agents);
-    else if (task == FOLLOW) set_target_follow(agents, idx);
+    else if (task == FOLLOW) set_target_follow(rng, agents, idx);
     else if (task == CUBE) set_target_cube(agent, idx);
-    else if (task == CONGO) set_target_congo(agents, idx);
+    else if (task == CONGO) set_target_congo(rng, agents, idx);
     else if (task == FLAG) set_target_flag(agent, idx);
     else if (task == RACE) set_target_race(agent);
 }
