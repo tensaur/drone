@@ -9,6 +9,4 @@ authors = [
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "cfclient>=2025.9",
-]
+dependencies = []
