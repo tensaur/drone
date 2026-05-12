@@ -25,9 +25,10 @@ py-source := `git ls-files --cached --others --exclude-standard '*.py' | xargs`
 source := f'{{c-source}} {{py-source}}'
 
 # pull the container image and install host-side firmware tools
+# (images are amd64-only; Apple Silicon Macs use Rosetta via --platform)
 [group: "docker"]
 setup TAG="auto": update-submodules _setup-host
-    docker pull ghcr.io/tensaur/drone:$(just _resolve-tag {{TAG}})
+    docker pull --platform linux/amd64 ghcr.io/tensaur/drone:$(just _resolve-tag {{TAG}})
 
 # start a dev shell inside the container (auto-runs setup-puffer on entry)
 [group: "docker"]
@@ -37,6 +38,7 @@ dev TAG="auto":
     tag=$(just _resolve-tag {{TAG}})
     [ "$tag" = cuda ] && gpu="--gpus all" || gpu=""
     docker run -it --rm --name drone $gpu --ipc host \
+        --platform linux/amd64 \
         -v "$(pwd):/work" -e WANDB_API_KEY \
         ghcr.io/tensaur/drone:$tag \
         bash -c 'just setup-puffer && exec bash'
