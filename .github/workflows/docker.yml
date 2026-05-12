@@ -25,19 +25,16 @@ jobs:
             arch: amd64
             runner: ubuntu-24.04
             base_image: nvcr.io/nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
-            nccl: "libnccl2 libnccl-dev"
             torch_index: https://download.pytorch.org/whl/cu130
           - backend: cpu
             arch: amd64
             runner: ubuntu-24.04
             base_image: ubuntu:24.04
-            nccl: ""
             torch_index: https://download.pytorch.org/whl/cpu
           - backend: cpu
             arch: arm64
             runner: ubuntu-24.04-arm
             base_image: ubuntu:24.04
-            nccl: ""
             torch_index: https://download.pytorch.org/whl/cpu
     runs-on: ${{ matrix.runner }}
     steps:
@@ -55,7 +52,6 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           build-args: |
             BASE_IMAGE=${{ matrix.base_image }}
-            NCCL_PACKAGES=${{ matrix.nccl }}
             TORCH_INDEX_URL=${{ matrix.torch_index }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ matrix.backend }}-${{ matrix.arch }}

@@ -1,10 +1,8 @@
 # syntax=docker/dockerfile:1.6
 ARG BASE_IMAGE=nvcr.io/nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
-ARG NCCL_PACKAGES="libnccl2 libnccl-dev"
 ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
 
 FROM ${BASE_IMAGE}
-ARG NCCL_PACKAGES
 ARG TORCH_INDEX_URL
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -13,7 +11,6 @@ ENV UV_EXTRA_INDEX_URL=${TORCH_INDEX_URL}
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential clang ccache \
         libomp-dev libglfw3 libgl1-mesa-dev \
-        ${NCCL_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path \
