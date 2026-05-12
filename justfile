@@ -10,6 +10,7 @@ alias cf := clean-firmware
 alias clean := clean-firmware
 alias f := flash-firmware
 alias flash := flash-firmware
+alias d := dev
 alias e := eval
 alias t := train
 alias swp := sweep
@@ -23,15 +24,38 @@ c-source := `git ls-files --cached --others --exclude-standard '*.c' '*.h' ':!co
 py-source := `git ls-files --cached --others --exclude-standard '*.py' | xargs`
 source := f'{{c-source}} {{py-source}}'
 
-# setup submodules, pufferlib env and crazyflie firmware
-setup: update-submodules setup-puffer setup-firmware
+# pull the container image and install host-side firmware tools
+[group: "docker"]
+setup TAG="auto": update-submodules _setup-host
+    docker pull ghcr.io/tensaur/drone:$(just _resolve-tag {{TAG}})
+
+# start a dev shell inside the container (auto-runs setup-puffer on entry)
+[group: "docker"]
+dev TAG="auto":
+    #!/usr/bin/env bash
+    set -e
+    tag=$(just _resolve-tag {{TAG}})
+    [ "$tag" = cuda ] && gpu="--gpus all" || gpu=""
+    docker run -it --rm --name drone $gpu --ipc host \
+        -v "$(pwd):/work" -e WANDB_API_KEY \
+        ghcr.io/tensaur/drone:$tag \
+        bash -c 'just setup-puffer && exec bash'
+
+# resolve an image tag: TAG="auto" picks cuda on x86 with nvidia-smi, cpu otherwise
+[private]
+_resolve-tag TAG="auto":
+    #!/usr/bin/env bash
+    tag="{{TAG}}"
+    if [ "$tag" = auto ]; then
+        case "$(uname -m)" in
+            arm64|aarch64) tag=cpu ;;
+            *) command -v nvidia-smi >/dev/null 2>&1 && tag=cuda || tag=cpu ;;
+        esac
+    fi
+    echo "$tag"
 
 # builds all source code, i.e. pufferlib and crazyflie firmware
 build: build-puffer build-firmware
-
-[private]
-_check_venv:
-    uv sync --inexact --quiet
 
 # format the specified source files, or all in project if no args
 format +FILES=source:
@@ -52,7 +76,7 @@ format +FILES=source:
 # format the specified C files, or all in project if no args
 [private]
 c-format +FILES=c-source:
-    @clang-format -style="{ColumnLimit: 100, IndentWidth: 4, TabWidth: 4, DerivePointerAlignment: false, PointerAlignment: Left, AllowShortIfStatementsOnASingleLine: AllIfsAndElse, IndentCaseLabels: true}" -i {{FILES}}
+    @clang-format -i {{FILES}}
 
 # format the specified Python files, or all in project if no args
 [private]
@@ -63,63 +87,128 @@ py-format +FILES=py-source:
 update-submodules:
     git submodule update --init --recursive -q
 
-# setup and build puffer, also creates symlinks for env
+# create the project venv, install pufferlib editable
 [group: "puffer"]
-setup-puffer: setup-puffer-symlinks install-puffer build-puffer
+setup-puffer: setup-puffer-symlinks
+    #!/usr/bin/env bash
+    set -e
+    fingerprint=$(just _puffer-fingerprint)
+    if [ -f .venv/.puffer-built ] && [ "$(cat .venv/.puffer-built 2>/dev/null)" = "$fingerprint" ]; then
+        exit 0
+    fi
+    [ -d .venv ] || uv venv --python 3.13 .venv
+    # Pick the torch wheel index based on whether nvcc (CUDA) is available
+    cuda_ver=$(nvcc --version 2>/dev/null | grep -oE 'release [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | tr -d '.')
+    if [ -n "$cuda_ver" ]; then
+        export UV_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu${cuda_ver}"
+        build_flag=""
+    else
+        export UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+        build_flag="--cpu"
+    fi
+    VIRTUAL_ENV=.venv uv pip install -e pufferlib
+    (cd pufferlib && PATH="$(pwd)/../.venv/bin:$PATH" bash build.sh drone $build_flag)
+    echo "$fingerprint" > .venv/.puffer-built
 
-# installs pufferlib to the python venv using uv
-[group: "puffer"]
-install-puffer: _check_venv
-    uv pip install -e pufferlib
+# native install: host + setup-puffer
+[group: "docker"]
+setup-native: update-submodules _setup-host setup-puffer
 
-# builds the pufferlib C code, requires pufferlib to be installed to venv
+# install host-side tools (e.g. cfclient)
+[private]
+_setup-host:
+    uv tool install --upgrade cfclient
+
+# build inputs fingerprint — anything that should trigger a re-install/rebuild
+[private]
+_puffer-fingerprint:
+    #!/usr/bin/env bash
+    {
+        git -C pufferlib rev-parse HEAD 2>/dev/null
+        find env -type f \( -name '*.c' -o -name '*.h' \) 2>/dev/null \
+            | sort | xargs sha256sum 2>/dev/null
+        sha256sum pyproject.toml 2>/dev/null
+    } | sha256sum | cut -d' ' -f1
+
+# unconditional rebuild
 [group: "puffer", working-directory: "pufferlib"]
-build-puffer: _check_venv
-    uv pip show pufferlib
-    ../.venv/bin/python3 setup.py build_ext --inplace
+build-puffer:
+    PATH="$(pwd)/../.venv/bin:$PATH" bash build.sh drone $(command -v nvcc >/dev/null || echo --cpu)
+    just _puffer-fingerprint > ../.venv/.puffer-built
 
 # eval the env with a given model, use `MODEL=latest` for last trained (tip: use `just bp eval` to build the env and then eval it)
 [group: "puffer"]
-eval DEVICE="cpu" MODEL="" TASK="":
-    ./.venv/bin/puffer eval puffer_drone --train.device {{DEVICE}} {{ if MODEL == "" { "" } else { "--load-model-path " + MODEL } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
+eval MODEL="" TASK="":
+    #!/usr/bin/env bash
+    set -e
+    args=()
+    [ -n "{{MODEL}}" ] && args+=(--load-model-path "{{MODEL}}")
+    [ -n "{{TASK}}" ] && args+=(--env.task "$(just _task-id {{TASK}})")
+    ./.venv/bin/puffer eval drone "${args[@]}"
 
-# train the model on a task using a specific device, optionally specify TRACK to log stats to the specified wandb project
+# train the model on a task, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
-train DEVICE="cpu" TASK="hover" TRACK="":
-    ./.venv/bin/puffer train puffer_drone --train.device {{DEVICE}} {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
+train TASK="hover" TRACK="":
+    #!/usr/bin/env bash
+    set -e
+    args=(--env.task "$(just _task-id {{TASK}})")
+    [ -n "{{TRACK}}" ] && args+=(--wandb --wandb-project "{{TRACK}}")
+    ./.venv/bin/puffer train drone "${args[@]}"
 
-# sweep for hypers on a specific device, optionally specify TRACK to log stats to the specified wandb project
+# sweep for hypers on a task, optionally specify TRACK to log stats to the specified wandb project
 [group: "puffer"]
-sweep DEVICE="cpu" TASK="hover" TRACK="":
-    ./.venv/bin/puffer sweep puffer_drone --train.device {{DEVICE}} --max-runs 10000 {{ if TRACK == "" { "" } else { "--wandb --wandb-project " + TRACK } }} {{ if TASK == "" { "" } else { "--env.task " + TASK } }}
+sweep TASK="hover" TRACK="":
+    #!/usr/bin/env bash
+    set -e
+    args=(--max-runs 10000 --env.task "$(just _task-id {{TASK}})")
+    [ -n "{{TRACK}}" ] && args+=(--wandb --wandb-project "{{TRACK}}")
+    ./.venv/bin/puffer sweep drone "${args[@]}"
 
-# export the model weights, and convert to a header file for use in hardware
+# resolve a task name (e.g. "hover") to its int id; pass-through if already numeric
+[private]
+_task-id TASK:
+    #!/usr/bin/env bash
+    case "{{TASK}}" in
+        idle)   echo 0 ;;
+        hover)  echo 1 ;;
+        orbit)  echo 2 ;;
+        follow) echo 3 ;;
+        cube)   echo 4 ;;
+        congo)  echo 5 ;;
+        flag)   echo 6 ;;
+        race)   echo 7 ;;
+        *)      echo "{{TASK}}" ;;
+    esac
+
+# export the latest .bin checkpoint to a C header for the firmware
 [group: "puffer"]
 export MODEL="latest":
-    ./.venv/bin/puffer export puffer_drone --load-model-path {{MODEL}} --train.device cpu
+    #!/usr/bin/env bash
+    set -e
+    if [ "{{MODEL}}" = "latest" ]; then
+        bin=$(find checkpoints/drone -name "*.bin" 2>/dev/null | sort | tail -1)
+        [ -n "$bin" ] || { echo "No checkpoints found in checkpoints/drone/"; exit 1; }
+    else
+        bin="{{MODEL}}"
+    fi
+    echo "Exporting weights from: $bin"
     mkdir -p ./build
     gcc -o ./build/bin2h ./tools/bin2h.c
-    ./build/bin2h puffer_drone_weights.bin ./controller/src/weights.h
+    ./build/bin2h "$bin" ./controller/src/weights.h
 
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
 setup-puffer-symlinks:
     # overwrite env source code
-    @rm -rf ./pufferlib/pufferlib/ocean/drone
-    ln -s "$(pwd)/env" ./pufferlib/pufferlib/ocean/drone
+    @rm -rf ./pufferlib/ocean/drone
+    ln -s "$(pwd)/env" ./pufferlib/ocean/drone
 
     # overwrite resources
-    @rm -rf ./pufferlib/pufferlib/resources/drone
-    ln -s "$(pwd)/resources" ./pufferlib/pufferlib/resources/drone
+    @rm -rf ./pufferlib/resources/drone
+    ln -s "$(pwd)/resources" ./pufferlib/resources/drone
 
     # overwrite hypers config
-    ln -sf "$(pwd)/config/drone.ini" ./pufferlib/pufferlib/config/ocean/drone.ini
-
-    # overwrite model
-    ln -sf "$(pwd)/models/models.py" ./pufferlib/pufferlib/ocean/torch.py
-
-    # copy latest env binding to drone project root
-    ln -sf ./pufferlib/pufferlib/ocean/env_binding.h ./env_binding.h
+    ln -sf "$(pwd)/config/drone.ini" ./pufferlib/config/drone.ini
 
 # setup firmware: clean, configure for target device, and then build (incl. OOT controller)
 [group: "crazyflie"]
@@ -143,13 +232,13 @@ build-firmware:
 # flash the firmware to a Crazyflie drone (requires a Crazyradio with drivers installed on device)
 [group: "crazyflie", working-directory: "controller"]
 [arg("auto", long="auto", short="a", value="-w radio://0/80/2M/E7E7E7E7E7")]
-flash-firmware auto="": _check_venv
-    CLOAD_CMDS="{{auto}}" uv run make cload
+flash-firmware auto="":
+    CLOAD_CMDS="{{auto}}" uv run --with cflib make cload
 
-# open firmware control gui
+# open the Crazyflie GUI (requires `just setup` to have run `uv tool install cfclient`)
 [group: "crazyflie"]
 gui:
-    ./.venv/bin/cfclient
+    cfclient
 
 # configure firmware builds for the specified target device (cf21bl|cf2|bolt)
 [group: "crazyflie", working-directory: "controller", arg("PLATFORM", pattern="cf21bl|cf2|bolt")]

@@ -1,66 +1,47 @@
 #!/bin/bash
+set -e
 
 RED=$'\e[31m'
 GREEN=$'\e[32m'
-YELLOW=$'\e[33m'
 NC=$'\e[0m'
 
-set -e
+ok()  { echo -e "${GREEN}OK${NC}"; }
+err() { echo -e "${RED}FAILED${NC}"; echo "ERR: $1"; exit 1; }
+trap 'err "Command failed: $BASH_COMMAND"' ERR
 
-error_handler() {
-    echo -e "${RED}FAILED${NC}"
-    echo "ERR: $1"
-    exit 1
-}
+[[ -f pyproject.toml ]] || err "Run this script from the project root"
 
-trap 'error_handler "Command failed: $BASH_COMMAND"' ERR
+MODE=docker
+[[ "${1-}" = "--native" ]] && MODE=native
+[[ "${1-}" = "--docker" ]] && MODE=docker
+[[ -n "${1-}" && "$1" != "--native" && "$1" != "--docker" ]] \
+    && err "Unknown flag: $1 (use --native or --docker)"
 
-[[ -f pyproject.toml ]] || error_handler "Run this script from the project's root"
-
-echo -n "Updating git submodules... "
+echo -n "Initialising submodules... "
 git submodule update --init --recursive -q
-echo -e "${GREEN}OK!${NC}"
+ok
 
-echo -n "Checking uv is installed... "
-command -v uv &> /dev/null || error_handler "uv is not installed"
-echo -e "${GREEN}OK!${NC}"
+echo -n "Checking uv... "
+if ! command -v uv >/dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
+fi
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv >/dev/null || err "uv install failed"
+ok
 
-echo -n "Setting up python virtual environment... "
-uv sync --quiet
-echo -e "${GREEN}OK!${NC}"
+echo -n "Checking just... "
+if ! command -v just >/dev/null; then
+    mkdir -p "$HOME/.local/bin"
+    curl -LsSf https://just.systems/install.sh \
+        | bash -s -- --to "$HOME/.local/bin" >/dev/null 2>&1
+fi
+command -v just >/dev/null || err "just install failed"
+ok
 
-echo -n "Linking dev drone env to overwrite demo version in submodule... "
-# overwrite env source code
-rm -rf ./pufferlib/pufferlib/ocean/drone
-ln -s "$(pwd)/env" ./pufferlib/pufferlib/ocean/drone
-
-# overwrite resources
-rm -rf ./pufferlib/pufferlib/resources/drone
-ln -s "$(pwd)/resources" ./pufferlib/pufferlib/resources/drone
-
-# overwrite hypers config
-ln -sf "$(pwd)/config/drone.ini" ./pufferlib/pufferlib/config/ocean/drone.ini
-
-# overwrite model
-ln -sf "$(pwd)/models/models.py" ./pufferlib/pufferlib/ocean/torch.py
-
-# copy latest env binding to drone project root
-ln -sf ./pufferlib/pufferlib/ocean/env_binding.h ./env_binding.h
-echo -e "${GREEN}OK!${NC}"
-
-echo -n "Installing pufferlib to virtual environment... "
-uv pip install -e pufferlib --quiet
-echo -e "${GREEN}OK!${NC}"
-
-echo -n "Building pufferlib... "
-(cd pufferlib && ../.venv/bin/python setup.py build_ext --inplace > /dev/null 2>&1)
-echo -e "${GREEN}OK!${NC}"
-
-echo -n "Building platform config for Crazyflie 2.1 Brushless... "
-(cd crazyflie-firmware && make cf21bl_defconfig > /dev/null 2>&1)
-echo -e "${GREEN}OK!${NC}"
-
-echo -e "${GREEN}Done!${NC}"
-echo -e "${YELLOW}  Enable the virtual environment with the \`source ./.venv/bin/activate\` command.${NC}"
-echo -e "${YELLOW}  After env updates, rebuild pufferlib with \`python setup.py build_ext --inplace\` in the pufferlib directory.${NC}"
+echo "Handing off to: just ${MODE/docker/setup}${MODE/native/setup-native}"
+if [[ "$MODE" = native ]]; then
+    just setup-native
+else
+    just setup
+fi
 
