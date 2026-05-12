@@ -7,6 +7,7 @@ ARG TORCH_INDEX_URL
 ARG DEBIAN_FRONTEND=noninteractive
 
 ENV UV_EXTRA_INDEX_URL=${TORCH_INDEX_URL}
+ENV UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential clang ccache \

@@ -41,7 +41,7 @@ dev TAG="auto":
         --platform linux/amd64 \
         -v "$(pwd):/work" -e WANDB_API_KEY \
         ghcr.io/tensaur/drone:$tag \
-        bash -c 'just setup-puffer && exec bash'
+        bash -c 'just setup-puffer && exec bash' || true
 
 # resolve an image tag: TAG="auto" picks cuda on x86 with nvidia-smi, cpu otherwise
 [private]
@@ -98,7 +98,11 @@ setup-puffer: setup-puffer-symlinks
     if [ -f .venv/.puffer-built ] && [ "$(cat .venv/.puffer-built 2>/dev/null)" = "$fingerprint" ]; then
         exit 0
     fi
-    [ -d .venv ] || uv venv .venv
+
+    # fingerprint mismatch
+    rm -rf .venv
+    uv venv .venv
+
     # Pick the torch wheel index based on whether nvcc (CUDA) is available
     cuda_ver=$(nvcc --version 2>/dev/null | grep -oE 'release [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | tr -d '.')
     if [ -n "$cuda_ver" ]; then
@@ -126,6 +130,7 @@ _setup-host:
 _puffer-fingerprint:
     #!/usr/bin/env bash
     {
+        uname -sm
         git -C pufferlib rev-parse HEAD 2>/dev/null
         find env -type f \( -name '*.c' -o -name '*.h' \) 2>/dev/null \
             | sort | xargs sha256sum 2>/dev/null
@@ -146,6 +151,7 @@ eval MODEL="" TASK="":
     args=()
     [ -n "{{MODEL}}" ] && args+=(--load-model-path "{{MODEL}}")
     [ -n "{{TASK}}" ] && args+=(--env.task "$(just _task-id {{TASK}})")
+    command -v nvcc >/dev/null || args+=(--slowly)
     ./.venv/bin/puffer eval drone "${args[@]}"
 
 # train the model on a task, optionally specify TRACK to log stats to the specified wandb project
@@ -155,6 +161,7 @@ train TASK="hover" TRACK="":
     set -e
     args=(--env.task "$(just _task-id {{TASK}})")
     [ -n "{{TRACK}}" ] && args+=(--wandb --wandb-project "{{TRACK}}")
+    command -v nvcc >/dev/null || args+=(--slowly)
     ./.venv/bin/puffer train drone "${args[@]}"
 
 # sweep for hypers on a task, optionally specify TRACK to log stats to the specified wandb project
@@ -164,6 +171,7 @@ sweep TASK="hover" TRACK="":
     set -e
     args=(--max-runs 10000 --env.task "$(just _task-id {{TASK}})")
     [ -n "{{TRACK}}" ] && args+=(--wandb --wandb-project "{{TRACK}}")
+    command -v nvcc >/dev/null || args+=(--slowly)
     ./.venv/bin/puffer sweep drone "${args[@]}"
 
 # resolve a task name (e.g. "hover") to its int id; pass-through if already numeric
@@ -201,16 +209,12 @@ export MODEL="latest":
 # create symlinks in pufferlib submodule to allow for env development in ./env
 [group: "puffer"]
 setup-puffer-symlinks:
-    # overwrite env source code
-    @rm -rf ./pufferlib/ocean/drone
-    ln -s "$(pwd)/env" ./pufferlib/ocean/drone
-
-    # overwrite resources
-    @rm -rf ./pufferlib/resources/drone
-    ln -s "$(pwd)/resources" ./pufferlib/resources/drone
-
-    # overwrite hypers config
-    ln -sf "$(pwd)/config/drone.ini" ./pufferlib/config/drone.ini
+    #!/usr/bin/env bash
+    rm -rf ./pufferlib/ocean/drone
+    ln -s ../../env ./pufferlib/ocean/drone
+    rm -rf ./pufferlib/resources/drone
+    ln -s ../../resources ./pufferlib/resources/drone
+    ln -sf ../../config/drone.ini ./pufferlib/config/drone.ini
 
 # setup firmware: clean, configure for target device, and then build (incl. OOT controller)
 [group: "crazyflie"]
