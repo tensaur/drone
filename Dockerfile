@@ -13,7 +13,6 @@ ENV UV_EXTRA_INDEX_URL=${TORCH_INDEX_URL}
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates curl git build-essential clang ccache \
         libomp-dev libglfw3 libgl1-mesa-dev \
-        python3.13 python3.13-dev \
         ${NCCL_PACKAGES} \
  && rm -rf /var/lib/apt/lists/*
 

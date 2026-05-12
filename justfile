@@ -96,7 +96,7 @@ setup-puffer: setup-puffer-symlinks
     if [ -f .venv/.puffer-built ] && [ "$(cat .venv/.puffer-built 2>/dev/null)" = "$fingerprint" ]; then
         exit 0
     fi
-    [ -d .venv ] || uv venv --python 3.13 .venv
+    [ -d .venv ] || uv venv .venv
     # Pick the torch wheel index based on whether nvcc (CUDA) is available
     cuda_ver=$(nvcc --version 2>/dev/null | grep -oE 'release [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | tr -d '.')
     if [ -n "$cuda_ver" ]; then
