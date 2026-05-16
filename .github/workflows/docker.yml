@@ -21,9 +21,19 @@ jobs:
           - backend: cuda
             base_image: nvcr.io/nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
             torch_index: https://download.pytorch.org/whl/cu130
+            target: base
           - backend: cpu
             base_image: ubuntu:24.04
             torch_index: https://download.pytorch.org/whl/cpu
+            target: base
+          - backend: cuda-jupyter
+            base_image: nvcr.io/nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
+            torch_index: https://download.pytorch.org/whl/cu130
+            target: jupyter
+          - backend: cpu-jupyter
+            base_image: ubuntu:24.04
+            torch_index: https://download.pytorch.org/whl/cpu
+            target: jupyter
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -38,9 +48,10 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
+          target: ${{ matrix.target }}
           build-args: |
             BASE_IMAGE=${{ matrix.base_image }}
             TORCH_INDEX_URL=${{ matrix.torch_index }}
           tags: ghcr.io/${{ github.repository }}:${{ matrix.backend }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.backend }}
-          cache-to:   type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.backend }},mode=max
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.backend }},mode=max
