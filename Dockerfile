@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
-ARG BASE_IMAGE=nvcr.io/nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
-ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu130
+ARG BASE_IMAGE=nvcr.io/nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 
 FROM ${BASE_IMAGE} AS base
 ARG TORCH_INDEX_URL
@@ -10,7 +10,7 @@ ENV UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git build-essential clang ccache \
-    libomp-dev libglfw3 libgl1-mesa-dev \
+    libomp-dev libglfw3 libgl1-mesa-dev python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- --no-modify-path \
@@ -21,6 +21,6 @@ WORKDIR /work
 CMD ["bash"]
 
 FROM base AS jupyter
-RUN uv pip install --system jupyterlab
+RUN uv pip install --system --break-system-packages jupyterlab
 EXPOSE 8080
 CMD ["jupyter", "lab", "--allow-root", "--ip=0.0.0.0", "--port=8080", "--no-browser", "--ServerApp.token=''", "--ServerApp.allow_origin='*'"]
