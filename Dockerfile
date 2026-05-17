@@ -21,7 +21,12 @@ WORKDIR /work
 CMD ["bash"]
 
 FROM base AS jupyter
-RUN uv pip install --system --break-system-packages jupyterlab
+RUN uv pip install --system --break-system-packages \
+    jupyterlab ipywidgets jupyter-server-proxy
+
+COPY --from=emscripten/emsdk:latest /emsdk /opt/emsdk
+ENV EMSDK=/opt/emsdk \
+    PATH=/opt/emsdk:/opt/emsdk/upstream/emscripten:/opt/emsdk/upstream/bin:/opt/emsdk/node/current/bin:${PATH}
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

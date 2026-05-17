@@ -3,6 +3,7 @@
 alias b := build
 alias bp := build-puffer
 alias bf := build-firmware
+alias bw := build-web
 alias s := setup
 alias sp := setup-puffer
 alias sf := setup-firmware
@@ -145,6 +146,24 @@ _puffer-fingerprint:
 build-puffer:
     PATH="$(pwd)/../.venv/bin:$PATH" bash build.sh drone $(command -v nvcc >/dev/null || echo --cpu)
     just _puffer-fingerprint > ../.venv/.puffer-built
+
+# build the env for web with a checkpoint baked in
+[group: "puffer"]
+build-web MODEL="latest": setup-puffer-symlinks
+    #!/usr/bin/env bash
+    set -e
+    command -v emcc >/dev/null || { echo "emcc missing — use a *-jupyter image"; exit 1; }
+    if [ "{{MODEL}}" = "latest" ]; then
+        bin=$(find checkpoints/drone -name "*.bin" 2>/dev/null | sort | tail -1)
+        [ -n "$bin" ] || { echo "No checkpoints in checkpoints/drone/"; exit 1; }
+    else
+        bin="{{MODEL}}"
+    fi
+    [ -f "$bin" ] || { echo "Checkpoint not found: $bin"; exit 1; }
+    cp "$bin" pufferlib/ocean/drone/weights.bin
+    (cd pufferlib && bash build.sh drone --web)
+    mkdir -p build/web && mv pufferlib/game.* build/web/
+    echo "$bin" > build/web/MODEL
 
 # eval the env with a given model, use `MODEL=latest` for last trained (tip: use `just bp eval` to build the env and then eval it)
 [group: "puffer"]
