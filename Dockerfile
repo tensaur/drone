@@ -22,8 +22,12 @@ CMD ["bash"]
 
 FROM base AS jupyter
 RUN uv pip install --system --break-system-packages jupyterlab
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
 EXPOSE 8080
+
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["bash"]
+CMD []
+

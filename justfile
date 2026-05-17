@@ -36,7 +36,10 @@ dev TAG="auto":
     #!/usr/bin/env bash
     set -e
     tag=$(just _resolve-tag {{TAG}})
-    [ "$tag" = cuda ] && gpu="--gpus all" || gpu=""
+    case "$tag" in
+        cuda|cuda-jupyter) gpu="--gpus all" ;;
+        *) gpu="" ;;
+    esac
     docker run -it --rm --name drone $gpu --ipc host \
         --platform linux/amd64 \
         -v "$(pwd):/work" -e WANDB_API_KEY \
