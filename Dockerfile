@@ -9,7 +9,7 @@ ENV UV_EXTRA_INDEX_URL=${TORCH_INDEX_URL}
 ENV UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git build-essential clang ccache \
+    ca-certificates curl git build-essential clang ccache unzip \
     libomp-dev libglfw3 libgl1-mesa-dev python3 \
     && rm -rf /var/lib/apt/lists/*
 

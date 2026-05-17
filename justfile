@@ -160,9 +160,9 @@ build-web MODEL="latest": setup-puffer-symlinks
         bin="{{MODEL}}"
     fi
     [ -f "$bin" ] || { echo "Checkpoint not found: $bin"; exit 1; }
-    cp "$bin" pufferlib/ocean/drone/weights.bin
+    cp "$bin" resources/drone_weights.bin
     (cd pufferlib && bash build.sh drone --web)
-    mkdir -p build/web && mv pufferlib/game.* build/web/
+    mkdir -p build/web && mv pufferlib/build/web/drone/game.* build/web/
     echo "$bin" > build/web/MODEL
 
 # eval the env with a given model, use `MODEL=latest` for last trained (tip: use `just bp eval` to build the env and then eval it)

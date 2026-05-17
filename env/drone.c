@@ -53,7 +53,7 @@ int main() {
     Weights* weights = load_weights("resources/drone/drone_weights.bin");
     int logit_sizes[4] = {1, 1, 1, 1};
     // make_puffernet(weights, num_agents, obs_size, hidden_size, num_layers, logit_sizes, num_actions)
-    PufferNet* net = make_puffernet(weights, env->num_agents, obs_size, 128, 6, logit_sizes, 4);
+    PufferNet* net = make_puffernet(weights, env->num_agents, obs_size, 64, 1, logit_sizes, 4);
 
     init(env);
     c_reset(env);
