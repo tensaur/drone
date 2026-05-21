@@ -1,7 +1,7 @@
 #include "drone.h"
-#include "task_hover.h"
 #include "puffernet.h"
 #include "render.h"
+#include "task_hover.h"
 #include <time.h>
 
 #ifdef __EMSCRIPTEN__
@@ -38,32 +38,27 @@ int main() {
 
     // task config — hardcoded for demo
     HoverConfig* cfg = (HoverConfig*)calloc(1, sizeof(HoverConfig));
-    cfg->target_dist   = 5.0f;
-    cfg->hover_dist    = 0.1f;
-    cfg->hover_omega   = 0.1f;
-    cfg->hover_vel     = 0.1f;
-    cfg->alpha_dist    = 0.782192f;
-    cfg->alpha_hover   = 0.071445f;
+    cfg->target_dist = 5.0f;
+    cfg->hover_dist = 0.1f;
+    cfg->hover_omega = 0.1f;
+    cfg->hover_vel = 0.1f;
+    cfg->alpha_dist = 0.782192f;
+    cfg->alpha_hover = 0.071445f;
     cfg->alpha_shaping = 3.9754f;
-    cfg->alpha_omega   = 0.00135588f;
+    cfg->alpha_omega = 0.00135588f;
     env->task_config = cfg;
 
-    HoverState* state = (HoverState*)calloc(1, sizeof(HoverState));
-    state->prev_potential = (float*)calloc(env->num_agents, sizeof(float));
-    env->task_state = state;
-
-    log_register(&env->log, "hover_score");
-    log_register(&env->log, "oob");
-    log_register(&env->log, "timeout");
+    env->task_state = hover_create_state(env);
 
     c_reset(env);
 
     Weights* weights = load_weights("resources/drone/drone_weights.bin");
     int logit_sizes[4] = {1, 1, 1, 1};
-    PufferNet* net = make_puffernet(weights, env->num_agents, DRONE_OBS_SIZE, 128, 6, logit_sizes, 4);
+    PufferNet* net =
+        make_puffernet(weights, env->num_agents, DRONE_OBS_SIZE, 128, 6, logit_sizes, 4);
 
 #ifdef __EMSCRIPTEN__
-    WebRenderArgs args = { .env = env, .net = net };
+    WebRenderArgs args = {.env = env, .net = net};
     emscripten_set_main_loop_arg(emscriptenStep, &args, 0, true);
 #else
     c_render(env);

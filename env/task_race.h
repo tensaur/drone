@@ -16,6 +16,19 @@ typedef struct {
     float* collisions;
 } RaceState;
 
+enum {
+    RACE_LOG_RINGS_PASSED,
+    RACE_LOG_RING_COLLISIONS,
+    RACE_LOG_COMPLETED,
+    RACE_LOG_N,
+};
+
+static const char* const RACE_LOG_KEYS[RACE_LOG_N] = {
+    "rings_passed",
+    "ring_collisions",
+    "completed",
+};
+
 static inline void reset_rings(unsigned int* rng, Target* ring_buffer, int num_rings) {
     ring_buffer[0] = rndring(rng, RING_RADIUS);
     for (int i = 1; i < num_rings; i++) {
@@ -47,26 +60,23 @@ static inline int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-static void race_init(DroneEnv* env, Dict* kwargs) {
+static void race_init(DroneEnv* env, void* kwargs_) {
+    Dict* kwargs = (Dict*)kwargs_;
     RaceConfig* cfg = (RaceConfig*)calloc(1, sizeof(RaceConfig));
-    cfg->max_rings         = (int)dict_get(kwargs, "max_rings")->value;
-    cfg->ring_reward       = dict_get(kwargs, "ring_reward")->value;
+    cfg->max_rings = (int)dict_get(kwargs, "max_rings")->value;
+    cfg->ring_reward = dict_get(kwargs, "ring_reward")->value;
     cfg->collision_penalty = dict_get(kwargs, "collision_penalty")->value;
-    cfg->time_penalty      = dict_get(kwargs, "time_penalty")->value;
-    cfg->alpha_dist        = dict_get(kwargs, "alpha_dist")->value;
+    cfg->time_penalty = dict_get(kwargs, "time_penalty")->value;
+    cfg->alpha_dist = dict_get(kwargs, "alpha_dist")->value;
     env->task_config = cfg;
 
     env->ring_buffer = (Target*)calloc(cfg->max_rings, sizeof(Target));
 
     RaceState* state = (RaceState*)calloc(1, sizeof(RaceState));
-    state->ring_idx     = (int*)calloc(env->num_agents, sizeof(int));
+    state->ring_idx = (int*)calloc(env->num_agents, sizeof(int));
     state->rings_passed = (int*)calloc(env->num_agents, sizeof(int));
-    state->collisions   = (float*)calloc(env->num_agents, sizeof(float));
+    state->collisions = (float*)calloc(env->num_agents, sizeof(float));
     env->task_state = state;
-
-    log_register(&env->log, "rings_passed");    // 0
-    log_register(&env->log, "ring_collisions"); // 1
-    log_register(&env->log, "completed");       // 2
 }
 
 static void race_free(DroneEnv* env) {
@@ -85,7 +95,6 @@ static void race_env_reset(DroneEnv* env) {
 }
 
 static void race_reset(DroneEnv* env, Drone* agent, int idx) {
-    RaceConfig* cfg = (RaceConfig*)env->task_config;
     RaceState* state = (RaceState*)env->task_state;
 
     do {
@@ -123,16 +132,18 @@ static float race_reward(DroneEnv* env, Drone* agent, int idx, StepCache* cache)
 static bool race_done(DroneEnv* env, Drone* agent, int idx, StepCache* cache) {
     RaceConfig* cfg = (RaceConfig*)env->task_config;
     RaceState* state = (RaceState*)env->task_state;
-    return state->rings_passed[idx] >= cfg->max_rings
-        || agent->episode_length >= HORIZON;
+    return state->rings_passed[idx] >= cfg->max_rings || agent->episode_length >= HORIZON;
 }
 
 static void race_log(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache* cache) {
     RaceConfig* cfg = (RaceConfig*)env->task_config;
     RaceState* state = (RaceState*)env->task_state;
-    log_add(log, 0, (float)state->rings_passed[idx]);
-    log_add(log, 1, state->collisions[idx]);
-    log_add(log, 2, state->rings_passed[idx] >= cfg->max_rings ? 1.0f : 0.0f);
+    float completed = state->rings_passed[idx] >= cfg->max_rings ? 1.0f : 0.0f;
+    log->score += (float)state->rings_passed[idx];
+    log->perf += completed;
+    log_task_add(log, RACE_LOG_RINGS_PASSED, (float)state->rings_passed[idx]);
+    log_task_add(log, RACE_LOG_RING_COLLISIONS, state->collisions[idx]);
+    log_task_add(log, RACE_LOG_COMPLETED, completed);
 }
 
 static void race_render(DroneEnv* env, Client* client) {
@@ -142,13 +153,15 @@ static void race_render(DroneEnv* env, Client* client) {
 }
 
 static const TaskDef TASK_RACE = {
-    .name      = "race",
-    .init      = race_init,
-    .free      = race_free,
+    .name = "race",
+    .log_keys = RACE_LOG_KEYS,
+    .num_log_keys = RACE_LOG_N,
+    .init = race_init,
+    .free = race_free,
     .env_reset = race_env_reset,
-    .reset     = race_reset,
-    .reward    = race_reward,
-    .done      = race_done,
-    .log       = race_log,
-    .render    = race_render,
+    .reset = race_reset,
+    .reward = race_reward,
+    .done = race_done,
+    .log = race_log,
+    .render = race_render,
 };

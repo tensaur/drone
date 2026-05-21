@@ -24,29 +24,23 @@ typedef struct {
 } StepCache;
 
 // --- log ---
+// Log struct must be pure floats — vecenv.h aggregates it as a flat float array
 
-#define MAX_LOG_ENTRIES 8
-#define LOG_KEY_LEN 24
+#define MAX_TASK_LOG_ENTRIES 16
 
 typedef struct Log Log;
 struct Log {
-    char keys[MAX_LOG_ENTRIES][LOG_KEY_LEN];
-    float values[MAX_LOG_ENTRIES];
-    int num_keys;
-
+    float score;
+    float perf;
     float episode_return;
     float episode_length;
+    float task[MAX_TASK_LOG_ENTRIES];
     float n;
 };
 
-static inline int log_register(Log* log, const char* key) {
-    int idx = log->num_keys++;
-    strncpy(log->keys[idx], key, LOG_KEY_LEN - 1);
-    return idx;
-}
-
-static inline void log_add(Log* log, int idx, float value) {
-    log->values[idx] += value;
+static inline void log_task_add(Log* log, int idx, float value) {
+    if (idx < 0 || idx >= MAX_TASK_LOG_ENTRIES) return;
+    log->task[idx] += value;
 }
 
 // --- task interface ---
@@ -56,11 +50,13 @@ typedef struct Client Client;
 
 typedef struct {
     const char* name;
+    const char* const* log_keys;
+    int num_log_keys;
 
-    void (*init)(DroneEnv* env, Dict* kwargs);
+    void (*init)(DroneEnv* env, void* kwargs);
     void (*free)(DroneEnv* env);
-    void (*env_reset)(DroneEnv* env);
 
+    void (*env_reset)(DroneEnv* env);
     void (*reset)(DroneEnv* env, Drone* agent, int idx);
     float (*reward)(DroneEnv* env, Drone* agent, int idx, StepCache* cache);
     bool (*done)(DroneEnv* env, Drone* agent, int idx, StepCache* cache);
@@ -119,15 +115,13 @@ void add_log(DroneEnv* env, int idx, StepCache* cache) {
     env->log.episode_length += agent->episode_length;
     env->log.n += 1.0f;
 
-    if (env->task->log)
-        env->task->log(env, agent, idx, &env->log, cache);
+    if (env->task->log) env->task->log(env, agent, idx, &env->log, cache);
 }
 
 // --- the RL loop ---
 
 void c_reset(DroneEnv* env) {
-    if (env->task->env_reset)
-        env->task->env_reset(env);
+    if (env->task->env_reset) env->task->env_reset(env);
 
     for (int i = 0; i < env->num_agents; i++) {
         Drone* agent = &env->agents[i];
@@ -151,9 +145,9 @@ void c_step(DroneEnv* env) {
 
         StepCache cache = {
             .prev_dist = norm3(sub3(agent->target->pos, agent->prev_pos)),
-            .dist      = norm3(sub3(agent->target->pos, agent->state.pos)),
-            .vel       = norm3(agent->state.vel),
-            .omega     = norm3(agent->state.omega),
+            .dist = norm3(sub3(agent->target->pos, agent->state.pos)),
+            .vel = norm3(agent->state.vel),
+            .omega = norm3(agent->state.omega),
         };
 
         float reward = env->task->reward(env, agent, i, &cache);
@@ -179,13 +173,11 @@ void c_step(DroneEnv* env) {
 void c_close_client(Client* client);
 
 void c_close(DroneEnv* env) {
-    if (env->task->free)
-        env->task->free(env);
+    if (env->task->free) env->task->free(env);
 
     for (int i = 0; i < env->num_agents; i++)
         free(env->agents[i].target);
     free(env->agents);
 
-    if (env->client != NULL)
-        c_close_client(env->client);
+    if (env->client != NULL) c_close_client(env->client);
 }
