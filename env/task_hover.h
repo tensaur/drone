@@ -39,17 +39,6 @@ static const char* const HOVER_LOG_KEYS[HOVER_LOG_N] = {
     "ema_dist", "ema_vel", "ema_omega", "oob", "timeout",
 };
 
-static inline HoverState* hover_create_state(DroneEnv* env) {
-    HoverState* state = (HoverState*)calloc(1, sizeof(HoverState));
-    state->prev_potential = (float*)calloc(env->num_agents, sizeof(float));
-    state->score = (float*)calloc(env->num_agents, sizeof(float));
-    state->perf = (float*)calloc(env->num_agents, sizeof(float));
-    state->ema_dist = (float*)calloc(env->num_agents, sizeof(float));
-    state->ema_vel = (float*)calloc(env->num_agents, sizeof(float));
-    state->ema_omega = (float*)calloc(env->num_agents, sizeof(float));
-    return state;
-}
-
 static inline void hover_set_target(unsigned int* rng, Drone* agent, float target_dist) {
     float u = rndf(0.0f, 1.0f, rng);
     float v = rndf(0.0f, 1.0f, rng);
@@ -84,41 +73,6 @@ static inline float hover_score(float dist, float vel, float omega) {
     return 1.0f / (1.0f + 0.05f * penalty);
 }
 
-#ifdef OBS_SIZE
-static void hover_init(DroneEnv* env, void* kwargs_) {
-    Dict* kwargs = (Dict*)kwargs_;
-    HoverConfig* cfg = (HoverConfig*)calloc(1, sizeof(HoverConfig));
-    cfg->target_dist = dict_get(kwargs, "hover_target_dist")->value;
-    cfg->hover_dist = dict_get(kwargs, "hover_dist")->value;
-    cfg->hover_omega = dict_get(kwargs, "hover_omega")->value;
-    cfg->hover_vel = dict_get(kwargs, "hover_vel")->value;
-    cfg->alpha_dist = dict_get(kwargs, "alpha_dist")->value;
-    cfg->alpha_hover = dict_get(kwargs, "alpha_hover")->value;
-    cfg->alpha_shaping = dict_get(kwargs, "alpha_shaping")->value;
-    cfg->alpha_omega = dict_get(kwargs, "alpha_omega")->value;
-    env->task_config = cfg;
-
-    env->task_state = hover_create_state(env);
-}
-#else
-static void hover_init(DroneEnv* env, void* kwargs_) {
-    (void)env;
-    (void)kwargs_;
-}
-#endif
-
-static void hover_free(DroneEnv* env) {
-    HoverState* state = (HoverState*)env->task_state;
-    free(state->prev_potential);
-    free(state->score);
-    free(state->perf);
-    free(state->ema_dist);
-    free(state->ema_vel);
-    free(state->ema_omega);
-    free(state);
-    free(env->task_config);
-}
-
 static void hover_reset(DroneEnv* env, Drone* agent, int idx) {
     HoverConfig* cfg = (HoverConfig*)env->task_config;
     HoverState* state = (HoverState*)env->task_state;
@@ -143,9 +97,10 @@ static float hover_reward(DroneEnv* env, Drone* agent, int idx, StepCache* cache
     HoverState* state = (HoverState*)env->task_state;
 
     float curr = hover_potential(cache->dist, cache->vel, cache->omega, cfg);
-    float reward = cfg->alpha_dist * (cache->prev_dist - cache->dist) + cfg->alpha_hover * curr +
-                   cfg->alpha_shaping * (curr - state->prev_potential[idx]) -
-                   cfg->alpha_omega * cache->omega;
+    float reward = cfg->alpha_dist * (cache->prev_dist - cache->dist)
+                 + cfg->alpha_hover * curr
+                 + cfg->alpha_shaping * (curr - state->prev_potential[idx])
+                 - cfg->alpha_omega * cache->omega;
     state->prev_potential[idx] = curr;
 
     float score = hover_score(cache->dist, cache->vel, cache->omega);
@@ -178,8 +133,6 @@ static const TaskDef TASK_HOVER = {
     .name = "hover",
     .log_keys = HOVER_LOG_KEYS,
     .num_log_keys = HOVER_LOG_N,
-    .init = hover_init,
-    .free = hover_free,
     .env_reset = NULL,
     .reset = hover_reset,
     .reward = hover_reward,

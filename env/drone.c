@@ -48,7 +48,14 @@ int main() {
     cfg->alpha_omega = 0.00135588f;
     env->task_config = cfg;
 
-    env->task_state = hover_create_state(env);
+    HoverState* state = (HoverState*)calloc(1, sizeof(HoverState));
+    state->prev_potential = (float*)calloc(env->num_agents, sizeof(float));
+    state->score     = (float*)calloc(env->num_agents, sizeof(float));
+    state->perf      = (float*)calloc(env->num_agents, sizeof(float));
+    state->ema_dist  = (float*)calloc(env->num_agents, sizeof(float));
+    state->ema_vel   = (float*)calloc(env->num_agents, sizeof(float));
+    state->ema_omega = (float*)calloc(env->num_agents, sizeof(float));
+    env->task_state = state;
 
     c_reset(env);
 

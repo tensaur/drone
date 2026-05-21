@@ -60,35 +60,6 @@ static inline int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-static void race_init(DroneEnv* env, void* kwargs_) {
-    Dict* kwargs = (Dict*)kwargs_;
-    RaceConfig* cfg = (RaceConfig*)calloc(1, sizeof(RaceConfig));
-    cfg->max_rings = (int)dict_get(kwargs, "max_rings")->value;
-    cfg->ring_reward = dict_get(kwargs, "ring_reward")->value;
-    cfg->collision_penalty = dict_get(kwargs, "collision_penalty")->value;
-    cfg->time_penalty = dict_get(kwargs, "time_penalty")->value;
-    cfg->alpha_dist = dict_get(kwargs, "alpha_dist")->value;
-    env->task_config = cfg;
-
-    env->ring_buffer = (Target*)calloc(cfg->max_rings, sizeof(Target));
-
-    RaceState* state = (RaceState*)calloc(1, sizeof(RaceState));
-    state->ring_idx = (int*)calloc(env->num_agents, sizeof(int));
-    state->rings_passed = (int*)calloc(env->num_agents, sizeof(int));
-    state->collisions = (float*)calloc(env->num_agents, sizeof(float));
-    env->task_state = state;
-}
-
-static void race_free(DroneEnv* env) {
-    RaceState* state = (RaceState*)env->task_state;
-    free(state->ring_idx);
-    free(state->rings_passed);
-    free(state->collisions);
-    free(state);
-    free(env->ring_buffer);
-    free(env->task_config);
-}
-
 static void race_env_reset(DroneEnv* env) {
     RaceConfig* cfg = (RaceConfig*)env->task_config;
     reset_rings(&env->rng, env->ring_buffer, cfg->max_rings);
@@ -156,8 +127,6 @@ static const TaskDef TASK_RACE = {
     .name = "race",
     .log_keys = RACE_LOG_KEYS,
     .num_log_keys = RACE_LOG_N,
-    .init = race_init,
-    .free = race_free,
     .env_reset = race_env_reset,
     .reset = race_reset,
     .reward = race_reward,
