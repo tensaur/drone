@@ -32,15 +32,15 @@ typedef struct Log Log;
 struct Log {
     char keys[MAX_LOG_ENTRIES][LOG_KEY_LEN];
     float values[MAX_LOG_ENTRIES];
-    int n;
+    int num_keys;
 
     float episode_return;
     float episode_length;
-    float count;
+    float n;
 };
 
 static inline int log_register(Log* log, const char* key) {
-    int idx = log->n++;
+    int idx = log->num_keys++;
     strncpy(log->keys[idx], key, LOG_KEY_LEN - 1);
     return idx;
 }
@@ -57,7 +57,7 @@ typedef struct Client Client;
 typedef struct {
     const char* name;
 
-    void (*init)(DroneEnv* env, void* kwargs);
+    void (*init)(DroneEnv* env, Dict* kwargs);
     void (*free)(DroneEnv* env);
     void (*env_reset)(DroneEnv* env);
 
@@ -117,7 +117,7 @@ void add_log(DroneEnv* env, int idx, StepCache* cache) {
     Drone* agent = &env->agents[idx];
     env->log.episode_return += agent->episode_return;
     env->log.episode_length += agent->episode_length;
-    env->log.count += 1.0f;
+    env->log.n += 1.0f;
 
     if (env->task->log)
         env->task->log(env, agent, idx, &env->log, cache);

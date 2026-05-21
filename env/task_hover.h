@@ -24,8 +24,7 @@ static inline float hover_potential(float dist, float vel, float omega, HoverCon
     return d * (0.7f + 0.15f * v + 0.15f * w);
 }
 
-static void hover_init(DroneEnv* env, void* kwargs_) {
-    Dict* kwargs = (Dict*)kwargs_;
+static void hover_init(DroneEnv* env, Dict* kwargs) {
     HoverConfig* cfg = (HoverConfig*)calloc(1, sizeof(HoverConfig));
     cfg->target_dist   = dict_get(kwargs, "hover_target_dist")->value;
     cfg->hover_dist    = dict_get(kwargs, "hover_dist")->value;
