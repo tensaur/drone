@@ -47,7 +47,8 @@ static inline int check_ring(Drone* drone, Target* ring) {
     return 0;
 }
 
-static void race_init(DroneEnv* env, Dict* kwargs) {
+static void race_init(DroneEnv* env, void* kwargs_) {
+    Dict* kwargs = (Dict*)kwargs_;
     RaceConfig* cfg = (RaceConfig*)calloc(1, sizeof(RaceConfig));
     cfg->max_rings         = (int)dict_get(kwargs, "max_rings")->value;
     cfg->ring_reward       = dict_get(kwargs, "ring_reward")->value;

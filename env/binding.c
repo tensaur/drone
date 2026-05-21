@@ -1,7 +1,5 @@
 #include "drone.h"
 #include "render.h"
-#include "task_hover.h"
-#include "task_race.h"
 
 #define OBS_SIZE DRONE_OBS_SIZE
 #define NUM_ATNS 4
@@ -11,11 +9,17 @@
 #define Env DroneEnv
 #include "vecenv.h"
 
+#include "task_hover.h"
+#include "task_race.h"
+
+#define TASK_ID_HOVER 0
+#define TASK_ID_RACE  1
+
 void my_init(Env* env, Dict* kwargs) {
     env->num_agents = (int)dict_get(kwargs, "num_drones")->value;
 
-    char* task_name = dict_get_str(kwargs, "task");
-    if (strcasecmp(task_name, "race") == 0)
+    int task_id = (int)dict_get(kwargs, "task")->value;
+    if (task_id == TASK_ID_RACE)
         env->task = &TASK_RACE;
     else
         env->task = &TASK_HOVER;

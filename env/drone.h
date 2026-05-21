@@ -57,7 +57,7 @@ typedef struct Client Client;
 typedef struct {
     const char* name;
 
-    void (*init)(DroneEnv* env, Dict* kwargs);
+    void (*init)(DroneEnv* env, void* kwargs);
     void (*free)(DroneEnv* env);
     void (*env_reset)(DroneEnv* env);
 
