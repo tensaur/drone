@@ -16,19 +16,6 @@ typedef struct {
     float* collisions;
 } RaceState;
 
-enum {
-    RACE_LOG_RINGS_PASSED,
-    RACE_LOG_RING_COLLISIONS,
-    RACE_LOG_COMPLETED,
-    RACE_LOG_N,
-};
-
-static const char* const RACE_LOG_KEYS[RACE_LOG_N] = {
-    "rings_passed",
-    "ring_collisions",
-    "completed",
-};
-
 static inline void reset_rings(unsigned int* rng, Target* ring_buffer, int num_rings) {
     ring_buffer[0] = rndring(rng, RING_RADIUS);
     for (int i = 1; i < num_rings; i++) {
@@ -112,9 +99,9 @@ static void race_log(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache* 
     float completed = state->rings_passed[idx] >= cfg->max_rings ? 1.0f : 0.0f;
     log->score += (float)state->rings_passed[idx];
     log->perf += completed;
-    log_task_add(log, RACE_LOG_RINGS_PASSED, (float)state->rings_passed[idx]);
-    log_task_add(log, RACE_LOG_RING_COLLISIONS, state->collisions[idx]);
-    log_task_add(log, RACE_LOG_COMPLETED, completed);
+    log_task_add(log, 0, (float)state->rings_passed[idx]); // rings_passed
+    log_task_add(log, 1, state->collisions[idx]);           // ring_collisions
+    log_task_add(log, 2, completed);                        // completed
 }
 
 static void race_render(DroneEnv* env, Client* client) {
@@ -125,8 +112,8 @@ static void race_render(DroneEnv* env, Client* client) {
 
 static const TaskDef TASK_RACE = {
     .name = "race",
-    .log_keys = RACE_LOG_KEYS,
-    .num_log_keys = RACE_LOG_N,
+    .log_keys = {"rings_passed", "ring_collisions", "completed"},
+    .num_log_keys = 3,
     .env_reset = race_env_reset,
     .reset = race_reset,
     .reward = race_reward,

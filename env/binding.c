@@ -75,10 +75,6 @@ void my_log(Log* log, Dict* out) {
     dict_set(out, "episode_return", log->episode_return);
     dict_set(out, "episode_length", log->episode_length);
 
-    if (LOG_TASK == NULL) return;
-
-    int n = LOG_TASK->num_log_keys;
-    if (n > MAX_TASK_LOG_ENTRIES) n = MAX_TASK_LOG_ENTRIES;
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < LOG_TASK->num_log_keys; i++)
         dict_set(out, LOG_TASK->log_keys[i], log->task[i]);
 }

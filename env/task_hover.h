@@ -26,19 +26,6 @@ typedef struct {
     float* ema_omega;
 } HoverState;
 
-enum {
-    HOVER_LOG_EMA_DIST,
-    HOVER_LOG_EMA_VEL,
-    HOVER_LOG_EMA_OMEGA,
-    HOVER_LOG_OOB,
-    HOVER_LOG_TIMEOUT,
-    HOVER_LOG_N,
-};
-
-static const char* const HOVER_LOG_KEYS[HOVER_LOG_N] = {
-    "ema_dist", "ema_vel", "ema_omega", "oob", "timeout",
-};
-
 static inline void hover_set_target(unsigned int* rng, Drone* agent, float target_dist) {
     float u = rndf(0.0f, 1.0f, rng);
     float v = rndf(0.0f, 1.0f, rng);
@@ -122,17 +109,17 @@ static void hover_log(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache*
     HoverState* state = (HoverState*)env->task_state;
     log->score += state->score[idx];
     log->perf += state->perf[idx];
-    log_task_add(log, HOVER_LOG_EMA_DIST, state->ema_dist[idx]);
-    log_task_add(log, HOVER_LOG_EMA_VEL, state->ema_vel[idx]);
-    log_task_add(log, HOVER_LOG_EMA_OMEGA, state->ema_omega[idx]);
-    log_task_add(log, HOVER_LOG_OOB, cache->dist > (cfg->target_dist + 1.0f) ? 1.0f : 0.0f);
-    log_task_add(log, HOVER_LOG_TIMEOUT, agent->episode_length >= HORIZON ? 1.0f : 0.0f);
+    log_task_add(log, 0, state->ema_dist[idx]);  // ema_dist
+    log_task_add(log, 1, state->ema_vel[idx]);   // ema_vel
+    log_task_add(log, 2, state->ema_omega[idx]); // ema_omega
+    log_task_add(log, 3, cache->dist > (cfg->target_dist + 1.0f) ? 1.0f : 0.0f); // oob
+    log_task_add(log, 4, agent->episode_length >= HORIZON ? 1.0f : 0.0f);         // timeout
 }
 
 static const TaskDef TASK_HOVER = {
     .name = "hover",
-    .log_keys = HOVER_LOG_KEYS,
-    .num_log_keys = HOVER_LOG_N,
+    .log_keys = {"ema_dist", "ema_vel", "ema_omega", "oob", "timeout"},
+    .num_log_keys = 5,
     .env_reset = NULL,
     .reset = hover_reset,
     .reward = hover_reward,

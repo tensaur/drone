@@ -50,7 +50,7 @@ typedef struct Client Client;
 
 typedef struct {
     const char* name;
-    const char* const* log_keys;
+    const char* log_keys[MAX_TASK_LOG_ENTRIES];
     int num_log_keys;
 
     void (*env_reset)(DroneEnv* env);
