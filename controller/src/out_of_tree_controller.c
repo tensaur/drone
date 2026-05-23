@@ -1,7 +1,7 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <math.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -69,19 +69,20 @@ void controllerOutOfTreeInit() {
     // PUFFERDRONE: Test logits: -60.580 -7.712 -1.272 -5.215
     // PUFFERDRONE: Test logits: -60.580 -7.712 -1.272 -5.215
     float test_obs[23];
-    for (int i = 0; i < 23; i++) test_obs[i] = 1.0f;
-    test_obs[22] = 0.0f; test_obs[21] = 0.0f; test_obs[20] = 0.0f; test_obs[19] = 0.0f;
+    for (int i = 0; i < 23; i++)
+        test_obs[i] = 1.0f;
+    test_obs[22] = 0.0f;
+    test_obs[21] = 0.0f;
+    test_obs[20] = 0.0f;
+    test_obs[19] = 0.0f;
     forward_linearcontlstm(puffer_controller, test_obs);
-    DEBUG_PRINT("Test logits: %.3f %.3f %.3f %.3f\n",
-                (double)puffer_controller->actor->output[0],
+    DEBUG_PRINT("Test logits: %.3f %.3f %.3f %.3f\n", (double)puffer_controller->actor->output[0],
                 (double)puffer_controller->actor->output[1],
                 (double)puffer_controller->actor->output[2],
                 (double)puffer_controller->actor->output[3]);
 }
 
-bool controllerOutOfTreeTest() {
-    return true;
-}
+bool controllerOutOfTreeTest() { return true; }
 
 void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
                          const sensorData_t* sensors, const state_t* state, const uint32_t tick) {
@@ -93,15 +94,12 @@ void controllerOutOfTree(control_t* control, const setpoint_t* setpoint,
         if (controller_tick % 10 == 0) {
             uint32_t start = xTaskGetTickCount();
 
-            drone.state.pos  = (Vec3){state->position.x, state->position.y, state->position.z};
-            drone.state.vel  = (Vec3){state->velocity.x, state->velocity.y, state->velocity.z};
-            drone.state.quat = (Quat){state->attitudeQuaternion.w,
-                                      state->attitudeQuaternion.x,
-                                      state->attitudeQuaternion.y,
-                                      state->attitudeQuaternion.z};
-            drone.state.omega = (Vec3){sensors->gyro.x * toRad,
-                                       sensors->gyro.y * toRad,
-                                       sensors->gyro.z * toRad};
+            drone.state.pos = (Vec3){state->position.x, state->position.y, state->position.z};
+            drone.state.vel = (Vec3){state->velocity.x, state->velocity.y, state->velocity.z};
+            drone.state.quat = (Quat){state->attitudeQuaternion.w, state->attitudeQuaternion.x,
+                                      state->attitudeQuaternion.y, state->attitudeQuaternion.z};
+            drone.state.omega =
+                (Vec3){sensors->gyro.x * toRad, sensors->gyro.y * toRad, sensors->gyro.z * toRad};
             target.pos = (Vec3){setpoint->position.x, setpoint->position.y, setpoint->position.z};
 
             compute_drone_observations(&drone, observations);
