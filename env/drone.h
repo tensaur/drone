@@ -14,17 +14,12 @@
 
 #define HORIZON 1024
 
-// --- step cache ---
-
 typedef struct {
     float dist;
     float prev_dist;
     float vel;
     float omega;
 } StepCache;
-
-// --- log ---
-// Log struct must be pure floats — vecenv.h aggregates it as a flat float array
 
 #define MAX_TASK_LOG_ENTRIES 16
 
@@ -43,8 +38,6 @@ static inline void log_task_add(Log* log, int idx, float value) {
     log->task[idx] += value;
 }
 
-// --- task interface ---
-
 typedef struct DroneEnv DroneEnv;
 typedef struct Client Client;
 
@@ -61,8 +54,6 @@ typedef struct {
     void (*log)(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache* cache);
     void (*render)(DroneEnv* env, Client* client);
 } TaskDef;
-
-// --- env ---
 
 struct DroneEnv {
     float* observations;
@@ -83,8 +74,6 @@ struct DroneEnv {
     Target* ring_buffer;
     Client* client;
 };
-
-// --- core ---
 
 void compute_observations(DroneEnv* env) {
     for (int i = 0; i < env->num_agents; i++)
@@ -114,8 +103,6 @@ void add_log(DroneEnv* env, int idx, StepCache* cache) {
 
     if (env->task->log) env->task->log(env, agent, idx, &env->log, cache);
 }
-
-// --- the RL loop ---
 
 void c_reset(DroneEnv* env) {
     if (env->task->env_reset) env->task->env_reset(env);
@@ -164,8 +151,6 @@ void c_step(DroneEnv* env) {
 
     compute_observations(env);
 }
-
-// --- cleanup ---
 
 void c_close_client(Client* client);
 

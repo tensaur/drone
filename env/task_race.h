@@ -99,9 +99,9 @@ static void race_log(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache* 
     float completed = state->rings_passed[idx] >= cfg->max_rings ? 1.0f : 0.0f;
     log->score += (float)state->rings_passed[idx];
     log->perf += completed;
-    log_task_add(log, 0, (float)state->rings_passed[idx]); // rings_passed
-    log_task_add(log, 1, state->collisions[idx]);           // ring_collisions
-    log_task_add(log, 2, completed);                        // completed
+    log_task_add(log, 0, (float)state->rings_passed[idx]);
+    log_task_add(log, 1, state->collisions[idx]);
+    log_task_add(log, 2, completed);
 }
 
 static void race_render(DroneEnv* env, Client* client) {

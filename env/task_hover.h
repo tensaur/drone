@@ -109,11 +109,11 @@ static void hover_log(DroneEnv* env, Drone* agent, int idx, Log* log, StepCache*
     HoverState* state = (HoverState*)env->task_state;
     log->score += state->score[idx];
     log->perf += state->perf[idx];
-    log_task_add(log, 0, state->ema_dist[idx]);  // ema_dist
-    log_task_add(log, 1, state->ema_vel[idx]);   // ema_vel
-    log_task_add(log, 2, state->ema_omega[idx]); // ema_omega
-    log_task_add(log, 3, cache->dist > (cfg->target_dist + 1.0f) ? 1.0f : 0.0f); // oob
-    log_task_add(log, 4, agent->episode_length >= HORIZON ? 1.0f : 0.0f);         // timeout
+    log_task_add(log, 0, state->ema_dist[idx]);
+    log_task_add(log, 1, state->ema_vel[idx]);
+    log_task_add(log, 2, state->ema_omega[idx]);
+    log_task_add(log, 3, cache->dist > (cfg->target_dist + 1.0f) ? 1.0f : 0.0f);
+    log_task_add(log, 4, agent->episode_length >= HORIZON ? 1.0f : 0.0f);
 }
 
 static const TaskDef TASK_HOVER = {
