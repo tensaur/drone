@@ -329,9 +329,9 @@ struct LinearContLSTM {
     int num_actions;
     float* log_std;
     Linear* encoder1;
-    GELU*  gelu1;
+    GELU* gelu1;
     Linear* encoder2;
-    GELU*  gelu2;
+    GELU* gelu2;
     LSTM* lstm;
     Linear* actor;
     Linear* value_fn;

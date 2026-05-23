@@ -50,10 +50,10 @@ int main() {
 
     HoverState* state = (HoverState*)calloc(1, sizeof(HoverState));
     state->prev_potential = (float*)calloc(env->num_agents, sizeof(float));
-    state->score     = (float*)calloc(env->num_agents, sizeof(float));
-    state->perf      = (float*)calloc(env->num_agents, sizeof(float));
-    state->ema_dist  = (float*)calloc(env->num_agents, sizeof(float));
-    state->ema_vel   = (float*)calloc(env->num_agents, sizeof(float));
+    state->score = (float*)calloc(env->num_agents, sizeof(float));
+    state->perf = (float*)calloc(env->num_agents, sizeof(float));
+    state->ema_dist = (float*)calloc(env->num_agents, sizeof(float));
+    state->ema_vel = (float*)calloc(env->num_agents, sizeof(float));
     state->ema_omega = (float*)calloc(env->num_agents, sizeof(float));
     env->task_state = state;
 

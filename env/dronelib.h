@@ -169,7 +169,12 @@ static inline Quat quat_mul(Quat q1, Quat q2) {
 
 static inline void quat_normalize(Quat* q) {
     float n = sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
-    if (n > 0.0f) { q->w /= n; q->x /= n; q->y /= n; q->z /= n; }
+    if (n > 0.0f) {
+        q->w /= n;
+        q->x /= n;
+        q->y /= n;
+        q->z /= n;
+    }
 }
 
 static inline Vec3 quat_rotate(Quat q, Vec3 v) {
@@ -246,7 +251,8 @@ static inline void init_drone(Drone* drone, unsigned int* rng, float dr) {
     drone->params.k_mot = BASE_K_MOT * rndf(1.0f - dr, 1.0f + dr, rng);
 
     float hover = rpm_hover(&drone->params);
-    for (int i = 0; i < 4; i++) drone->state.rpms[i] = hover;
+    for (int i = 0; i < 4; i++)
+        drone->state.rpms[i] = hover;
 
     drone->state.pos = (Vec3){0, 0, 0};
     drone->prev_pos = drone->state.pos;
@@ -311,7 +317,8 @@ static inline void step(State* s, StateDerivative* d, float dt, State* out) {
     out->vel = add3(s->vel, scalmul3(d->v_dot, dt));
     out->quat = add_quat(s->quat, scalmul_quat(d->q_dot, dt));
     out->omega = add3(s->omega, scalmul3(d->w_dot, dt));
-    for (int i = 0; i < 4; i++) out->rpms[i] = s->rpms[i] + d->rpm_dot[i] * dt;
+    for (int i = 0; i < 4; i++)
+        out->rpms[i] = s->rpms[i] + d->rpm_dot[i] * dt;
     quat_normalize(&out->quat);
 }
 
@@ -329,25 +336,26 @@ static inline void rk4_step(State* state, Params* params, float* actions, float 
 
     float dt6 = dt / 6.0f;
 
-    state->pos.x += (k1.vel.x + 2*k2.vel.x + 2*k3.vel.x + k4.vel.x) * dt6;
-    state->pos.y += (k1.vel.y + 2*k2.vel.y + 2*k3.vel.y + k4.vel.y) * dt6;
-    state->pos.z += (k1.vel.z + 2*k2.vel.z + 2*k3.vel.z + k4.vel.z) * dt6;
+    state->pos.x += (k1.vel.x + 2 * k2.vel.x + 2 * k3.vel.x + k4.vel.x) * dt6;
+    state->pos.y += (k1.vel.y + 2 * k2.vel.y + 2 * k3.vel.y + k4.vel.y) * dt6;
+    state->pos.z += (k1.vel.z + 2 * k2.vel.z + 2 * k3.vel.z + k4.vel.z) * dt6;
 
-    state->vel.x += (k1.v_dot.x + 2*k2.v_dot.x + 2*k3.v_dot.x + k4.v_dot.x) * dt6;
-    state->vel.y += (k1.v_dot.y + 2*k2.v_dot.y + 2*k3.v_dot.y + k4.v_dot.y) * dt6;
-    state->vel.z += (k1.v_dot.z + 2*k2.v_dot.z + 2*k3.v_dot.z + k4.v_dot.z) * dt6;
+    state->vel.x += (k1.v_dot.x + 2 * k2.v_dot.x + 2 * k3.v_dot.x + k4.v_dot.x) * dt6;
+    state->vel.y += (k1.v_dot.y + 2 * k2.v_dot.y + 2 * k3.v_dot.y + k4.v_dot.y) * dt6;
+    state->vel.z += (k1.v_dot.z + 2 * k2.v_dot.z + 2 * k3.v_dot.z + k4.v_dot.z) * dt6;
 
-    state->quat.w += (k1.q_dot.w + 2*k2.q_dot.w + 2*k3.q_dot.w + k4.q_dot.w) * dt6;
-    state->quat.x += (k1.q_dot.x + 2*k2.q_dot.x + 2*k3.q_dot.x + k4.q_dot.x) * dt6;
-    state->quat.y += (k1.q_dot.y + 2*k2.q_dot.y + 2*k3.q_dot.y + k4.q_dot.y) * dt6;
-    state->quat.z += (k1.q_dot.z + 2*k2.q_dot.z + 2*k3.q_dot.z + k4.q_dot.z) * dt6;
+    state->quat.w += (k1.q_dot.w + 2 * k2.q_dot.w + 2 * k3.q_dot.w + k4.q_dot.w) * dt6;
+    state->quat.x += (k1.q_dot.x + 2 * k2.q_dot.x + 2 * k3.q_dot.x + k4.q_dot.x) * dt6;
+    state->quat.y += (k1.q_dot.y + 2 * k2.q_dot.y + 2 * k3.q_dot.y + k4.q_dot.y) * dt6;
+    state->quat.z += (k1.q_dot.z + 2 * k2.q_dot.z + 2 * k3.q_dot.z + k4.q_dot.z) * dt6;
 
-    state->omega.x += (k1.w_dot.x + 2*k2.w_dot.x + 2*k3.w_dot.x + k4.w_dot.x) * dt6;
-    state->omega.y += (k1.w_dot.y + 2*k2.w_dot.y + 2*k3.w_dot.y + k4.w_dot.y) * dt6;
-    state->omega.z += (k1.w_dot.z + 2*k2.w_dot.z + 2*k3.w_dot.z + k4.w_dot.z) * dt6;
+    state->omega.x += (k1.w_dot.x + 2 * k2.w_dot.x + 2 * k3.w_dot.x + k4.w_dot.x) * dt6;
+    state->omega.y += (k1.w_dot.y + 2 * k2.w_dot.y + 2 * k3.w_dot.y + k4.w_dot.y) * dt6;
+    state->omega.z += (k1.w_dot.z + 2 * k2.w_dot.z + 2 * k3.w_dot.z + k4.w_dot.z) * dt6;
 
     for (int i = 0; i < 4; i++)
-        state->rpms[i] += (k1.rpm_dot[i] + 2*k2.rpm_dot[i] + 2*k3.rpm_dot[i] + k4.rpm_dot[i]) * dt6;
+        state->rpms[i] +=
+            (k1.rpm_dot[i] + 2 * k2.rpm_dot[i] + 2 * k3.rpm_dot[i] + k4.rpm_dot[i]) * dt6;
 
     quat_normalize(&state->quat);
 }

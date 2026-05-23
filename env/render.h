@@ -564,8 +564,7 @@ void c_render(DroneEnv* env) {
     }
 
     // Task-specific rendering
-    if (env->task->render)
-        env->task->render(env, client);
+    if (env->task->render) env->task->render(env, client);
 
     // Targets (shown in inspect mode) - size based on render mode
     if (inspect_mode) {
