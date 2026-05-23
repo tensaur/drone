@@ -61,7 +61,7 @@ int main() {
 
     Weights* weights = load_weights("resources/drone/drone_weights.bin");
     int logit_sizes[4] = {1, 1, 1, 1};
-    PufferNet* net = make_puffernet(weights, env->num_agents, obs_size, 64, 1, logit_sizes, 4);
+    PufferNet* net = make_puffernet(weights, env->num_agents, DRONE_OBS_SIZE, 64, 1, logit_sizes, 4);
 
 #ifdef __EMSCRIPTEN__
     WebRenderArgs args = {.env = env, .net = net};
