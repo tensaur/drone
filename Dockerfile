@@ -9,7 +9,7 @@ ENV UV_EXTRA_INDEX_URL=${TORCH_INDEX_URL}
 ENV UV_LINK_MODE=copy
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git build-essential clang ccache \
+    ca-certificates curl git build-essential clang ccache unzip \
     libomp-dev libglfw3 libgl1-mesa-dev python3 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,7 +21,12 @@ WORKDIR /work
 CMD ["bash"]
 
 FROM base AS jupyter
-RUN uv pip install --system --break-system-packages jupyterlab
+RUN uv pip install --system --break-system-packages \
+    jupyterlab ipywidgets jupyter-server-proxy
+
+COPY --from=emscripten/emsdk:latest /emsdk /emsdk
+ENV EMSDK=/emsdk \
+    PATH=/emsdk:/emsdk/upstream/emscripten:${PATH}
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
